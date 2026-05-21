@@ -3,6 +3,16 @@
 All notable changes to **anchor** are tracked here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.5] — 2026-05-21
+
+### Fixed
+
+- **`install.sh` always returned exit code 1** (cosmetic but ugly). The final line was `[ "$WITH_HOOKS" = "0" ] && echo "..."`; when `WITH_HOOKS=1` (the default), `[` returns false, and bash uses the last command's exit code as the script's. Replaced with an explicit `if ... then ... fi` block plus a trailing `exit 0`. Files were always installed correctly; the bug only showed up if you piped `./install.sh; echo $?` or used it inside another shell script that checked the return code.
+
+### Plugin manifest
+
+- Versions bumped 1.3.4 → 1.3.5.
+
 ## [1.3.4] — 2026-05-21
 
 Documentation + tooling polish based on the v1.3 stress test learnings.

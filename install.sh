@@ -113,4 +113,9 @@ echo "  /done      — wrap-up checklist (lint + E2E + codex hint + CLAUDE.md wr
 echo ""
 echo "Enable autonomous mode (Stop hook blocks until task list is complete):"
 echo "  touch ~/.claude/.efficient-coding-autonomous"
-[ "$WITH_HOOKS" = "0" ] && echo "" && echo "(Skipped hooks — re-run without --no-hooks to enable them)"
+if [ "$WITH_HOOKS" = "0" ]; then
+    echo ""
+    echo "(Skipped hooks — re-run without --no-hooks to enable them)"
+fi
+
+exit 0
