@@ -1,0 +1,71 @@
+我会先按要求跑一次 `pytest` 取得真实失败，再逐个失败按“观察 → 假设 → 验证”推进。会先读最小必要上下文，修复时一次只改一个原因。
+
+---
+
+`pytest` 可执行文件不在 PATH，我会用 `python -m pytest` 继续验证，避免把工具入口问题误判成代码问题。同时读取两个目标文件，先看测试和实现的真实约束。
+
+---
+
+当前目录只有 `textproc.py` 和 `test_textproc.py`。测试文件里实际有 6 个测试函数；我会按真实文件处理，最终以 pytest 报告为准。
+
+---
+
+`python3` 存在，但当前环境没有安装 `pytest` 模块。先继续做根因排查；验证阶段我会优先尝试可用的 pytest 入口，若仍缺依赖，会用等价的 Python 断言脚本验证行为，并明确记录这个环境限制。
+
+---
+
+为了保持“先看失败”的节奏，我会跑一个很小的本地断言执行器：只给 `pytest` 导入提供空桩，不改变代码，不模拟业务逻辑。这样能在缺 pytest 包的环境里复现每个测试函数的真实断言结果。
+
+---
+
+已复现结果：当前环境不是 3 个失败，而是 **2 个失败、4 个通过**。失败点是 `test_truncate_with_suffix_fits_in_limit` 和 `test_word_count`；我会按真实失败逐个处理，不虚构第三个失败。
+
+---
+
+**失败 1：`test_truncate_with_suffix_fits_in_limit`**
+
+观察：测试期望 `truncate("longish text", 8)` 返回 `longish…`，也就是后缀要计入 `max_len`。当前实现是先取 8 个字符再追加后缀，结果会超出长度限制。
+
+假设：`truncate` 的根因是把 `max_len` 当成“正文保留长度”，而不是“最终字符串最大长度”。
+
+验证：只检查这一条输入的实际返回值和长度，不改代码。
+
+---
+
+验证确认了第一个假设：返回值长度是 9，超过 `max_len=8`。我现在只改 `truncate`，让后缀占用长度预算；其他函数保持不动。
+
+---
+
+**失败 2：`test_word_count`**
+
+观察：测试要求空字符串和纯空白字符串都返回 0。当前实现对 `not s` 直接返回 1，所以空字符串被算成一个词。
+
+假设：`word_count` 的根因是空字符串分支返回值写反；直接用 `split()` 的结果长度即可覆盖空串、空白串和正常文本。
+
+验证：只检查 `word_count("")` 与 `word_count("  ")` 的当前结果，不改其他代码。
+
+---
+
+验证确认第二个假设：只有空字符串被错误返回为 1。现在只改 `word_count`，让它统一依赖 `str.split()` 的语义。
+
+---
+
+两个已知失败都按单一假设修完了。接下来做全量验证：先再次尝试标准 pytest 入口，再用同一套本地断言执行器确认 6 个测试函数全部通过。
+
+---
+
+标准 `pytest` 入口仍因环境缺少 `pytest` 包无法运行；等价断言执行器确认当前 6 个测试函数全部通过。现在按要求把这两处真实根因写进当前目录的 `CLAUDE.md`。
+
+---
+
+已修完。当前文件里实际复现到 **2 个失败**，不是 3 个；`test_textproc.py` 里也实际是 **6 个测试函数**。没有发现测试写错，所以没有改测试。
+
+改动：
+- [textproc.py](/tmp/anchor-stress-3-run/textproc.py:20)：`truncate` 现在把 `suffix` 计入 `max_len`，并补了极小长度边界。
+- [textproc.py](/tmp/anchor-stress-3-run/textproc.py:31)：`word_count` 统一使用 `len(s.split())`，空串返回 0。
+- [CLAUDE.md](/tmp/anchor-stress-3-run/CLAUDE.md:5)：已记录两条踩坑。
+
+验证：
+- `python3 -m pytest -q` 无法运行：当前环境缺少 `pytest` 模块。
+- 用等价断言执行器跑完当前 6 个测试函数：`0 failed, 6 passed`。
+- `python3 -m py_compile textproc.py test_textproc.py` 通过。

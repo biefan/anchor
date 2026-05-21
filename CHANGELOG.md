@@ -3,6 +3,27 @@
 All notable changes to **anchor** are tracked here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.2] — 2026-05-21
+
+Patch in preparation for awesome-codex-plugins submission.
+
+### Added
+
+- **`assets/icon.svg`** — 512×512 SVG icon (711 bytes). Simple anchor mark in cream on deep blue. Referenced from `.codex-plugin/plugin.json` `interface.composerIcon`.
+
+### Changed
+
+- **`.codex-plugin/plugin.json`** schema upgraded to match `hashgraph-online/awesome-codex-plugins` CONTRIBUTING.md requirements:
+  - Added `license: "MIT"`.
+  - Added `keywords` (engineering-discipline, skill, hooks, slash-commands, claude-code, codex-cli, anti-drift, autonomous-mode, e2e-verification, pitfall-writeback).
+  - Added `interface.displayName`, `interface.shortDescription`, `interface.composerIcon`.
+- **`.claude-plugin/plugin.json`** — added `license: "MIT"` for hygiene (Claude Code doesn't require `interface`, so other new fields stay codex-side only).
+- Plugin manifest versions bumped 1.3.1 → 1.3.2.
+
+### Other
+
+- **PR submitted to `hashgraph-online/awesome-codex-plugins`** under Community / Development & Workflow, alphabetically between AgentOps and Antigravity. Includes the full bundle (plugin.json + icon + LICENSE + README) under `plugins/biefan/anchor/`.
+
 ## [1.3.1] — 2026-05-21
 
 Patch driven by the v1.3.0 demo run (which scored 3 pass / 4 fail). Inspection of the 4 fails showed only 1 was a real agent failure; the other 3 were rubric-design defects. Patched in this release.
