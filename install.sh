@@ -86,15 +86,17 @@ print(f"    (merged {added} new hook entries)")
 PYEOF
         echo "  ✓ Claude Code: hooks merged into settings.json (backup: $(basename "$BACKUP"))"
     else
-        # Fresh install — write a settings.json containing only hooks
-        python3 -c "
+        # Fresh install — write a settings.json containing only hooks.
+        # Paths are passed via sys.argv (NOT inline string interpolation) so a
+        # path containing a single quote can't break the Python source.
+        python3 - "$SCRIPT_DIR/settings.hooks.json" "$CLAUDE_DIR/settings.json" <<'PYEOF'
 import json, sys
 from pathlib import Path
-src = json.loads(Path('$SCRIPT_DIR/settings.hooks.json').read_text())
+src = json.loads(Path(sys.argv[1]).read_text())
 src.pop('_comment', None)
 src.pop('_optional_statusline', None)
-Path('$CLAUDE_DIR/settings.json').write_text(json.dumps(src, indent=2))
-"
+Path(sys.argv[2]).write_text(json.dumps(src, indent=2))
+PYEOF
         echo "  ✓ Claude Code: created ~/.claude/settings.json with hooks"
     fi
 fi

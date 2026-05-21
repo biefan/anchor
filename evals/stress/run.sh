@@ -31,8 +31,9 @@ USAGE
 fi
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-TS="$(date +%s)"
-SANDBOX="/tmp/anchor-stress-${ID}-${TS}"
+# mktemp -d gives us a unique sandbox dir even when several run.sh invocations
+# start in the same second (a $(date +%s)-based name would collide).
+SANDBOX="$(mktemp -d "/tmp/anchor-stress-${ID}-XXXXXX")"
 SPEC_FILE="$(find "$REPO_ROOT/evals/stress" -maxdepth 1 -name "0${ID}-*.md" | head -1)"
 
 if [ -z "$SPEC_FILE" ]; then

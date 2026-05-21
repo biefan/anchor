@@ -120,11 +120,27 @@ sys.exit(0)
 PYEOF
 
 # After python exits: if it wrote a block-marker file, log the event.
-if [ -f "$HOME/.claude/.ec-last-pretool-block" ]; then
+# Read the marker once (one python process, not three) and feed the three
+# fields into the logger via env vars.
+BLOCK_MARKER="$HOME/.claude/.ec-last-pretool-block"
+if [ -f "$BLOCK_MARKER" ]; then
+    # Read all 3 fields with one Python invocation; tab-separated so we can split safely.
+    IFS=$'\t' read -r EC_LOG_pattern EC_LOG_msg EC_LOG_seg < <(
+        python3 - "$BLOCK_MARKER" <<'PYEOF' 2>/dev/null
+import json, sys
+try:
+    d = json.load(open(sys.argv[1]))
+    # Sanitize: strip tabs/newlines so the tab-separated read above stays sane.
+    def clean(s): return (s or "").replace("\t", " ").replace("\n", " ")
+    print(f"{clean(d.get('pattern',''))}\t{clean(d.get('msg',''))}\t{clean(d.get('seg',''))}")
+except Exception:
+    print("\t\t")
+PYEOF
+    )
     EC_LOG_event="pretool_blocked" \
-    EC_LOG_pattern="$(python3 -c "import json; print(json.load(open('$HOME/.claude/.ec-last-pretool-block')).get('pattern',''))" 2>/dev/null)" \
-    EC_LOG_msg="$(python3 -c "import json; print(json.load(open('$HOME/.claude/.ec-last-pretool-block')).get('msg',''))" 2>/dev/null)" \
-    EC_LOG_seg="$(python3 -c "import json; print(json.load(open('$HOME/.claude/.ec-last-pretool-block')).get('seg',''))" 2>/dev/null)" \
+    EC_LOG_pattern="$EC_LOG_pattern" \
+    EC_LOG_msg="$EC_LOG_msg" \
+    EC_LOG_seg="$EC_LOG_seg" \
     ec_log_event
-    rm -f "$HOME/.claude/.ec-last-pretool-block"
+    rm -f "$BLOCK_MARKER"
 fi

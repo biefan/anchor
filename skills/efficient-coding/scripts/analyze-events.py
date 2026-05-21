@@ -59,13 +59,14 @@ def summarize(events):
     for ev_name in out["by_event"]:
         sub = [e for e in events if e.get("event") == ev_name]
         sample = sub[-3:]  # last 3 of this kind
-        out["details"][ev_name] = {
-            "count": len(sub),
-            "samples": [
-                {k: v for k, v in s.items() if k not in ("event", "ts")} | {"ts": s.get("ts", "")[:19]}
-                for s in sample
-            ],
-        }
+        # Build sample dicts. Use {**a, **b} instead of `a | b` so this stays
+        # compatible with Python 3.8 (dict union operator is 3.9+).
+        samples = []
+        for s in sample:
+            base = {k: v for k, v in s.items() if k not in ("event", "ts")}
+            base["ts"] = s.get("ts", "")[:19]
+            samples.append(base)
+        out["details"][ev_name] = {"count": len(sub), "samples": samples}
     # PreToolUse pattern breakdown
     pt = [e for e in events if e.get("event") == "pretool_blocked"]
     if pt:

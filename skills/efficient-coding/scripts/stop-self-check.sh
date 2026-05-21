@@ -38,10 +38,11 @@ if [ ! -d "$task_dir" ]; then
     exit 0
 fi
 
-# Check for incomplete tasks
-incomplete=$(python3 <<PYEOF 2>/dev/null
+# Check for incomplete tasks. task_dir comes from session_id (hook input) —
+# passed via env var so its contents never enter Python source as a literal.
+incomplete=$(EC_TASK_DIR="$task_dir" python3 - <<'PYEOF' 2>/dev/null
 import json, os, glob
-task_dir = "$task_dir"
+task_dir = os.environ.get("EC_TASK_DIR", "")
 incomplete = []
 for path in sorted(glob.glob(os.path.join(task_dir, "*.json"))):
     try:
