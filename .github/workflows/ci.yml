@@ -11,7 +11,7 @@ jobs:
     name: shellcheck
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Install shellcheck
         run: sudo apt-get update && sudo apt-get install -y shellcheck
       - name: Find and check all shell scripts
@@ -27,7 +27,7 @@ jobs:
     name: validate JSON
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Validate every *.json (skip evals/results)
         run: |
           set -e
@@ -42,7 +42,7 @@ jobs:
     name: install.sh smoke test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Run install.sh --no-hooks (no codex CLI in CI, so only Claude Code path runs)
         run: |
           set -e
