@@ -1,6 +1,8 @@
 # anchor
 
-> 让 Claude Code 写代码"少走错路、不偏题、跑到完为止"的一套工程化 skill + slash commands + hooks。
+[English](README.en.md) | **中文**
+
+> Claude Code / Codex CLI 的工程化纪律：skill + 7 个 slash commands + 4 个安全 hooks，让 AI 写代码"少走错路、不偏题、跑到完为止"。
 
 ## 它解决什么
 
@@ -27,11 +29,11 @@ cd ~/anchor
 ./install.sh
 ```
 
-`install.sh` 会做：
-1. 把 `skills/efficient-coding/` 复制到 `~/.claude/skills/`
-2. 把 `commands/*.md` 复制到 `~/.claude/commands/`
-3. 给 `scripts/*.sh` 加可执行权限
-4. 提示如何把 hook 配置 merge 进 `~/.claude/settings.json`
+`install.sh` 一键完成：
+1. 复制 skill / 7 个 slash commands / hook 脚本 到 `~/.claude/`
+2. **自动 merge hooks 到 `~/.claude/settings.json`**（带 timestamp backup，可用 `--no-hooks` 跳过）
+3. 检测到 codex CLI 就同时安装到 `~/.codex/`（skill + 7 commands as skills）
+4. 重复跑无副作用（idempotent，不会重复 merge hooks）
 
 **首次安装后需要重启 Claude Code**（如果 `~/.claude/skills/` 是首次创建的话）——live change detection 不监视会话启动时不存在的顶层目录。
 
@@ -39,7 +41,7 @@ cd ~/anchor
 
 ```
 anchor/
-├── README.md                          # 本文档
+├── README.md / README.en.md           # 本文档（中 / 英）
 ├── install.sh / uninstall.sh          # 一键安装/卸载
 ├── settings.hooks.json                # hooks 配置示例（要 merge 到自己的 settings.json）
 ├── skills/
@@ -243,7 +245,7 @@ codex plugin add anchor@anchor
 ./uninstall.sh
 ```
 
-会移除 `~/.claude/skills/efficient-coding/` 和 `~/.claude/commands/{lock-scope,record-pitfall,scan-deeper}.md`。`settings.json` 里的 hook 配置需要手动从 `hooks` 段移除。
+会移除 `~/.claude/skills/efficient-coding/` 和 7 个 `~/.claude/commands/*.md`，以及 `~/.codex/skills/{ec,lock,pit,scan,done,next,recap,init-claude-md}/`（如有）。`settings.json` 里的 hook 配置目前需要手动从 `hooks` 段移除。
 
 ## 致谢与参考
 
