@@ -1,0 +1,10 @@
+total 164
+drwxr-xr-x  6 root root   4096 May 21 08:58 .
+drwxrwxrwt 94 root root 110592 May 21 12:46 ..
+drwxr-xr-x  2 root root   4096 May 21 08:37 .agents
+drwxr-xr-x  2 root root   4096 May 21 08:37 .codex
+drwxr-xr-x  8 root root   4096 May 21 08:56 .git
+drwxr-xr-x  2 root root   4096 May 21 08:38 __pycache__
+-rw-r--r--  1 root root   1473 May 21 08:58 grading-v1.3.1.md
+-rw-r--r--  1 root root   1409 May 21 08:45 grading.md
+-rw-r--r--  1 root root   3737 May 21 08:40 order_processor.py

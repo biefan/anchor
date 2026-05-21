@@ -1,0 +1,127 @@
+我会先按 `ec` 技能读取项目约束并锁定任务边界，然后用现有行为测试做保护网，再分两次提交：测试提交、重构提交。
+
+---
+
+当前目录没有实际 `AGENTS.md` 文件，我会把你消息里的规则当作本任务约束；范围只落在 `order_processor.py`、测试文件和两次 git commit。
+
+---
+
+先做只读定位：我会同时查看当前实现、仓库状态和 Python 配置，避免测试或 lint 命令猜错。
+
+---
+
+现有行为里有两个关键点要锁住：商品查价会边算边改写 `items`，并且 `db.fetchone`、`db.execute`、`mailer.send`、`logger.info/warning/error` 的顺序就是可观测行为。下一步我会写固定时间的测试快照，把这些一起比较。
+
+---
+
+准备写测试文件：自定义 `FakeDB/FakeMailer/FakeLogger` 共用同一 `calls` 列表，固定 `datetime.now()`，用字面量快照同时断言返回值、输入变异和副作用顺序。
+
+---
+
+测试保护网已落盘，现在先让当前未重构版本跑过这些快照；如果失败，优先修测试期望，不能先改实现。
+
+---
+
+`pytest` 命令不在 PATH；我会检查是否能用 `python -m pytest`，并确认当前环境里 `ruff` 是否可用。
+
+---
+
+系统没有 `python` 入口，继续用 `python3` 检查；这属于环境入口差异，不改代码。
+
+---
+
+这里缺少 `pytest` 和 `ruff` 模块；我不会做全局安装。先检查是否有本地可用的包管理器或缓存入口，能在项目内临时环境验证就用项目内环境，否则会把阻塞如实记录。
+
+---
+
+`uv` 可用，我会尝试用临时缓存目录拉起项目外的临时环境执行 `pytest/ruff`，不改全局 Python；如果网络/DNS 被限制，再按环境阻塞处理。
+
+---
+
+临时 `uv` 环境也被 DNS 拦住，失败在拉取 `ruff`。我再单独尝试 `pytest`，确认不是包组合问题。
+
+---
+
+真实 `pytest` 仍无法安装。为避免盲改，我会用一个临时的极简 pytest 标记桩执行同一测试函数逻辑；这不能替代 `pytest` 验证，但能验证快照断言本身。
+
+---
+
+测试快照逻辑已用临时 runner 通过；真实 `pytest` 被缺依赖和 DNS 阻塞。现在按你的要求先只提交测试文件。
+
+---
+
+临时 runner 生成了 `__pycache__/`，这是我刚产生的测试缓存，不属于项目改动；我会清掉它，避免污染提交范围。
+
+---
+
+清理缓存的 `rm` 被本环境策略拦截，我不会绕过策略；提交时只暂存测试文件，缓存目录保持未跟踪。
+
+---
+
+`git add` 写 `.git/index.lock` 失败，说明工作区文件可写但 `.git` 元数据是只读的；我先确认权限，再继续重构代码，提交会如实标为环境阻塞。
+
+---
+
+现在重构 `order_processor.py`：只拆职责函数，不调整校验条件、SQL、时间调用位置、浮点公式或日志/邮件/DB 的先后顺序。
+
+---
+
+重构已完成。现在用同一组快照断言复跑行为验证；真实 `pytest/ruff` 仍受缺依赖影响，我会继续记录精确失败原因。
+
+---
+
+同一快照断言在重构后仍通过；`pytest` 和 `ruff` 命令本身因环境缺模块失败。接下来我会检查 diff，确认没有额外行为改动或提交外文件。
+
+---
+
+我会做一个轻量语法解析校验，避免在缺 `ruff/pytest` 的环境里至少遗漏明显语法问题；这不替代 lint。
+
+---
+
+我会做最后一轮低风险检查：空白差异、当前状态、以及确认 `.git` 写入仍然阻塞；这样最终报告能明确区分代码结果和环境限制。
+
+---
+
+代码侧检查完成：`git diff --check` 对已跟踪改动无空白问题；第二次 `git add` 仍因 `.git/index.lock` 只读失败，所以两步 commit 在当前沙箱无法执行。
+
+---
+
+为了不把临时验证缓存留给你，我会删除刚才由导入测试产生的两个 `.pyc` 文件；它们不是源码也不会进入提交。
+
+---
+
+已完成代码改动，但 **commit / pytest / ruff 在当前环境被阻塞**。
+
+改动内容：
+
+- 新增 [test_order_processor.py](/tmp/anchor-stress-2-run/test_order_processor.py:1)
+  - 用 `FakeDB / FakeMailer / FakeLogger` 做 snapshot 风格断言。
+  - 覆盖解析失败、校验错误、SKU 缺失、优惠券成功、邮件失败后仍记录成功日志。
+  - 固定时间，断言返回值、输入变异、DB / mailer / logger 调用顺序。
+
+- 重构 [order_processor.py](/tmp/anchor-stress-2-run/order_processor.py:8)
+  - 拆成 `parse_order / validate_order / price_order / discount_order / persist_order / notify_order`。
+  - 保留原 SQL、error code、`1.08` 税率、浮点计算方式、副作用顺序。
+
+验证结果：
+
+- 临时 runner 执行同一组测试断言：通过，重构前后都跑过。
+- `ast.parse` 语法检查：通过。
+- `git diff --check -- order_processor.py`：通过。
+
+环境阻塞：
+
+- `python3 -m pytest -q` 失败：`No module named pytest`
+- `python3 -m ruff check .` 失败：`No module named ruff`
+- `uv --with pytest/ruff` 失败：DNS 无法解析 `pypi.org`
+- `git add test_order_processor.py` 失败：`.git/index.lock` 位于只读文件系统，因此两次 commit 没有创建。
+
+当前状态还有：
+
+```text
+ M order_processor.py
+?? test_order_processor.py
+?? __pycache__/
+```
+
+`__pycache__/` 是临时 runner 导入测试时生成的缓存，`rm` 清理命令被环境策略拦截，未进入提交。

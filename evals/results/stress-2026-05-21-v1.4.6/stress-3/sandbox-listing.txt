@@ -1,0 +1,10 @@
+total 144
+drwxr-xr-x  4 root root   4096 May 21 09:08 .
+drwxrwxrwt 94 root root 110592 May 21 12:46 ..
+drwxr-xr-x  8 root root   4096 May 21 09:09 .git
+-rw-r--r--  1 root root   1065 May 21 09:06 CLAUDE.md
+drwxr-xr-x  2 root root   4096 May 21 09:06 __pycache__
+-rw-r--r--  1 root root   1654 May 21 09:08 grading.md
+-rw-r--r--  1 root root    880 May 21 09:03 test_textproc.py
+-rw-r--r--  1 root root   1091 May 21 09:06 textproc.py
+-rw-r--r--  1 root root   3752 May 21 09:07 transcript.txt
