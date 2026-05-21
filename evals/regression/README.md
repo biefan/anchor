@@ -12,8 +12,9 @@ Per-audit-round regression suites for `skills/efficient-coding/scripts/pre-tool-
 | `test-v1.4.4-git-cp-mv.py` | self r4 J/L sets | 15 | git destructive / git config injection / cp/mv to system |
 | `test-v1.4.5.py` | user-reported round 7 | 10 | runuser/doas/su -c variants + B2 |
 | `test-v1.4.6.py` | user-reported round 8 | 9 | mv to block device + git -c '!cmd' prefix |
+| `test-v1.4.7-pipe.py` | user UX feedback | 17 | pipeline-to-shell false-positive reduction |
 
-**Total**: 145 regression cases across 8 files, 9 audit rounds.
+**Total**: 162 regression cases across 9 files, 10 audit rounds.
 
 ## Running
 

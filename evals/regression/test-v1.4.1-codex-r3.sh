@@ -16,8 +16,8 @@ TESTS=(
     "BLOCK::rm -rf \$VAR::C8 bare \$VAR"
     "BLOCK::rm -rf /*::C8 glob /*"
     "BLOCK::rm -rf /{etc,var}::C8 brace expansion"
-    "BLOCK::cat script.sh | bash::C11 cat | bash"
-    "BLOCK::printf 'rm -rf /' | bash::C11 printf-literal | bash"
+    "PASS::cat script.sh | bash::C11 cat | bash (v1.4.7: legit, user knows local content)"
+    "BLOCK::printf 'rm -rf /' | bash::C11 printf-literal | bash (v1.4.7: blocks via dangerous-literal scan)"
 )
 pass=0
 fail=0

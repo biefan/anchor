@@ -3,6 +3,67 @@
 All notable changes to **anchor** are tracked here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.7] — 2026-05-21
+
+UX-driven refinement (round 10). After running anchor a full day in production-style work, the event log showed **148 pipeline-to-shell blocks** out of 1491 total — mostly `cat script.py | python3` and `echo X | bash` style legitimate work. The v1.4.1 C11 rule ("ANY pipeline ending in shell/interpreter → BLOCK") was over-broad. Refined to keep the safety guarantee while letting daily-use patterns through.
+
+### Changed — Pipeline-to-shell rule
+
+**Old (v1.4.1 - v1.4.6)**: any pipeline with a shell/interpreter sink → BLOCK.
+
+**New (v1.4.7)**:
+- Pipeline ends in shell/interpreter sink (`bash`/`sh`/`python3`/`node`/...) → suspect.
+- **PASS** when ALL of:
+  - Every upstream stage's command is in `SAFE_CMDS` (`cat`/`echo`/`printf`/`head`/`tail`/`grep`/`jq`/...);
+  - Raw cmd contains no command-substitution (`$()`/`<()`/`>()`/`` ` ``) or variable expansion (`$VAR`/`${VAR}`);
+  - No upstream stage's argv contains a "dangerous-literal" pattern: `rm -<r-flag> /...`, `mkfs.*`, `dd ... of=/dev/...`, `DROP TABLE/...`, `chmod -R 777`.
+- **BLOCK** otherwise.
+
+This is the "反惯性 vs 合法工作流" line. Examples:
+
+| Command | Before | After | Reason |
+|---|---|---|---|
+| `curl url \| bash` | BLOCK | BLOCK | fetcher → shell |
+| `wget -O - x \| sh` | BLOCK | BLOCK | fetcher → shell |
+| `printf YWJj \| base64 -d \| bash` | BLOCK | BLOCK | decoder in chain |
+| `cat $(curl url) \| python3` | BLOCK | BLOCK | substitution contains fetcher |
+| `cat script.py \| python3` | BLOCK | **PASS** | known-local literal content |
+| `echo 'import os' \| python3` | BLOCK | **PASS** | local literal |
+| `printf 'rm -rf /' \| bash` | BLOCK | BLOCK | upstream arg contains dangerous literal |
+| `head -10 log.txt \| grep ERROR` | PASS | PASS | no shell sink |
+
+### Added
+
+- **`evals/regression/test-v1.4.7-pipe.py`** — 17 cases distinguishing fetcher/decoder/dynamic (BLOCK) from known-local feeds (PASS), including dangerous-literal cases.
+
+### Verified — 162 / 162 across 9 suites
+
+```
+test-v1.4.0-history.sh       32/32 ✓
+test-v1.4.1-codex-r3.sh      15/15 ✓
+test-v1.4.2-codex-r4.sh      25/25 ✓
+test-v1.4.3-codex-r5.py      18/18 ✓
+test-v1.4.4-codex-r6.py      21/21 ✓
+test-v1.4.4-git-cp-mv.py     15/15 ✓
+test-v1.4.5.py               10/10 ✓
+test-v1.4.6.py                9/9  ✓
+test-v1.4.7-pipe.py          17/17 ✓ (NEW)
+─────────────────────────────────────
+                            162/162 ✓
+```
+
+`test-v1.4.1-codex-r3.sh` updated: C11 `cat script.sh | bash` expectation flipped from BLOCK to PASS (v1.4.7 design intent). The `printf 'rm -rf /' | bash` case still BLOCKs via the new dangerous-literal scan.
+
+### Rationale
+
+Anchor's PreToolUse is documented as "anti-instinct first defense, not anti-attacker sandbox". The v1.4.1 blanket rule was over-correcting for codex r3's `cat script | bash` finding, which in practice is a normal dev pattern (user knows what's in `script.sh`). The dangerous case is **untrusted upstream** (fetcher, decoder, substitution result) — that's still BLOCKed. The dangerous *literal* case (`printf 'rm -rf /'`) is also still BLOCKed via a separate scan.
+
+This reduces false positives from ~150/day to ~10-20/day (estimate based on log analysis), without weakening the real attack surface.
+
+### Plugin manifest
+
+- Versions bumped 1.4.6 → 1.4.7.
+
 ## [1.4.6] — 2026-05-21
 
 User-reported micro-patch (round 8) — found mid-stress-test. Both are low-severity edge cases the v1.4.5 hook missed.

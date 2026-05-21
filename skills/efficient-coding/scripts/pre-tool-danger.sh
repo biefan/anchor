@@ -1380,15 +1380,45 @@ if pipeline and len(pipeline) >= 2:
         b = basename(unwrapped[0]) if unwrapped else ""
         stage_bases.append(b)
 
-    # ANY pipeline whose final stage is a shell/interpreter is suspect —
-    # `cat script | bash`, `printf 'rm -rf /' | bash`, etc. are all the same
-    # risk class as `curl | bash`. Don't try to distinguish "trusted" upstream.
+    # v1.4.7: pipeline-to-shell rule refined per real-world UX data.
+    # v1.4.1's blanket "ANY shell sink → BLOCK" produced ~150 false positives
+    # per day from legitimate `cat script.py | python3` / `echo X | bash` work.
+    # New rule (the "反惯性 vs 合法工作流" line):
+    #   - Last stage is shell/interpreter sink → suspect
+    #   - If EVERY upstream stage is SAFE_CMDS AND raw cmd has no substitution/
+    #     variable expansion AND no upstream args contain dangerous-literal
+    #     patterns (rm -rf /, mkfs, dd of=/dev/, DROP) → PASS (known-local).
+    #   - Otherwise → BLOCK.
+    DANGEROUS_LITERAL_RE = re.compile(
+        r"\brm\s+-?-?[a-z]*[rR][a-z]*\s+(?:/|~|\$\{?HOME\}?)"
+        r"|\bmkfs\."
+        r"|\bdd\s+\S*of=/dev/"
+        r"|\bDROP\s+(?:TABLE|DATABASE|SCHEMA)\b"
+        r"|\bchmod\s+-R\s+777\b",
+        re.IGNORECASE,
+    )
     if stage_bases and stage_bases[-1] in SHELL_BASENAMES | INTERPRETER_BASENAMES:
-        # If the upstream stages are ALL safe-cmds reading static literals,
-        # we might still allow (rare). But conservative default is block.
-        emit_block("pipe-to-shell",
-                   f"pipeline 末端是 shell/interpreter ({stage_bases[-1]}) — 上游内容直进 shell 执行",
-                   " | ".join(stage_bases), cmd)
+        upstream_all_safe = all(b in SAFE_CMDS for b in stage_bases[:-1])
+        has_substitution = bool(re.search(r"\$\(|<\(|`|\$\{|\$[A-Za-z_]", cmd))
+        # Check if any upstream stage's args contain a dangerous-literal pattern.
+        # This catches `printf 'rm -rf /' | bash` where the *content* fed into
+        # shell is itself a destructive cmd literal.
+        has_dangerous_literal = False
+        for stage_argv in pipeline[:-1]:
+            joined = " ".join(stage_argv)
+            if DANGEROUS_LITERAL_RE.search(joined):
+                has_dangerous_literal = True
+                break
+        if upstream_all_safe and not has_substitution and not has_dangerous_literal:
+            pass  # Allow: known-local content, no dangerous literal
+        else:
+            reason = (
+                "上游含 dangerous-literal" if has_dangerous_literal
+                else "上游含 fetcher/decoder/动态展开"
+            )
+            emit_block("pipe-to-shell",
+                       f"pipeline 末端是 shell/interpreter ({stage_bases[-1]}) — {reason}",
+                       " | ".join(stage_bases), cmd)
 
 
 # --------------- Per-stage tokenized scan ---------------
