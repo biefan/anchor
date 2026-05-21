@@ -1,0 +1,61 @@
+{
+  "eval_id": 3,
+  "name": "pitfall-writeback",
+  "with_skill": {
+    "output_chars": 155,
+    "score": 1,
+    "judge": {
+      "results": [
+        {
+          "discriminator": "proposes_writing_to_project_claude_md_or_agents_md",
+          "triggered": false,
+          "evidence": "no evidence"
+        },
+        {
+          "discriminator": "uses_structured_four_field_template",
+          "triggered": false,
+          "evidence": "no evidence"
+        },
+        {
+          "discriminator": "explicitly_avoids_code_comments",
+          "triggered": false,
+          "evidence": "no evidence"
+        },
+        {
+          "discriminator": "includes_date_or_file_location_anchor",
+          "triggered": true,
+          "evidence": "`20260521T070956Z-redis-cluster-pipeline-cross-slot.md`"
+        }
+      ]
+    }
+  },
+  "without_skill": {
+    "output_chars": 275,
+    "score": 1,
+    "judge": {
+      "results": [
+        {
+          "discriminator": "proposes_writing_to_project_claude_md_or_agents_md",
+          "triggered": false,
+          "evidence": "no evidence"
+        },
+        {
+          "discriminator": "uses_structured_four_field_template",
+          "triggered": false,
+          "evidence": "no evidence"
+        },
+        {
+          "discriminator": "explicitly_avoids_code_comments",
+          "triggered": false,
+          "evidence": "no evidence"
+        },
+        {
+          "discriminator": "includes_date_or_file_location_anchor",
+          "triggered": true,
+          "evidence": "`cache/batch.ts:42`"
+        }
+      ]
+    }
+  },
+  "total_discriminators": 4
+}

@@ -1,0 +1,43 @@
+.avatar-upload-form {
+  display: grid;
+  gap: 12px;
+  max-width: 360px;
+}
+
+.avatar-upload-form__preview {
+  align-items: center;
+  background: #f6f7f8;
+  border: 1px solid #d7dce2;
+  border-radius: 8px;
+  color: #59636f;
+  display: flex;
+  height: 128px;
+  justify-content: center;
+  overflow: hidden;
+  width: 128px;
+}
+
+.avatar-upload-form__preview img {
+  height: 100%;
+  object-fit: cover;
+  width: 100%;
+}
+
+.avatar-upload-form__field {
+  display: grid;
+  gap: 6px;
+}
+
+.avatar-upload-form__error {
+  color: #b42318;
+  margin: 0;
+}
+
+.avatar-upload-form__success {
+  color: #067647;
+  margin: 0;
+}
+
+.avatar-upload-form button {
+  justify-self: start;
+}

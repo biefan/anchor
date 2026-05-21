@@ -1,0 +1,3 @@
+我会把这条坑记录写到 memories 的 ad hoc notes 里，作为后续检索用的增量记忆，不直接改主记忆索引。
+已记录。这条坑已经在 ad hoc memory notes 里：Redis cluster 下 pipeline 跨 slot 可能静默丢命令，`cache/batch.ts:42` 用 Redis hashtag 把 batch 相关 key 固定到同一 slot；以后碰到 Redis cluster + pipeline/batch 会主动检查 hash slot。
+

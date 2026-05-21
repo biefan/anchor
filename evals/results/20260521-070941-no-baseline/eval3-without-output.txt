@@ -1,0 +1,5 @@
+我会把这条作为一条小的 ad hoc memory note 写入记忆扩展目录，内容聚焦 Redis cluster pipeline 跨 slot 静默丢弃和 `cache/batch.ts:42` 的 hashtag 规避方式。
+目录已存在，我现在写一条独立 note，不改动已有 memory 文件。
+已记录到 memory update note：
+
+`/root/.codex/memories/extensions/ad_hoc/notes/20260521T071025Z-redis-cluster-pipeline-slot.md`

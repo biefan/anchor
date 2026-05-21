@@ -1,0 +1,8 @@
+migrations/202605210001_add_user_avatar_fields.sql
+package.json
+src/api/avatarRoutes.js
+src/api/avatarUploadService.js
+src/api/server.js
+src/web/AvatarUploadForm.css
+src/web/AvatarUploadForm.jsx
+test/integration/avatar-upload.test.mjs

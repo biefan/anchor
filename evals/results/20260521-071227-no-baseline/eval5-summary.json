@@ -1,0 +1,61 @@
+{
+  "eval_id": 5,
+  "name": "intent-clarification",
+  "with_skill": {
+    "output_chars": 628,
+    "score": 4,
+    "judge": {
+      "results": [
+        {
+          "discriminator": "asks_at_least_one_clarifying_question",
+          "triggered": true,
+          "evidence": "先确认 3 个点，你回数字/选项就行"
+        },
+        {
+          "discriminator": "questions_cover_scope_or_symptom_or_expectation",
+          "triggered": true,
+          "evidence": "改哪个登录？ / 要改什么？ / 现在的问题是什么？"
+        },
+        {
+          "discriminator": "offers_concrete_options_to_pick_from",
+          "triggered": true,
+          "evidence": "A. 后台管理登录 / B. 用户端登录 / C. API 登录接口 / D. 具体文件/页面你发路径"
+        },
+        {
+          "discriminator": "no_implementation_code_before_clarification",
+          "triggered": true,
+          "evidence": "给我这三个答案后我再动代码"
+        }
+      ]
+    }
+  },
+  "without_skill": {
+    "output_chars": 693,
+    "score": 4,
+    "judge": {
+      "results": [
+        {
+          "discriminator": "asks_at_least_one_clarifying_question",
+          "triggered": true,
+          "evidence": "先确认 3 点，你回选项即可"
+        },
+        {
+          "discriminator": "questions_cover_scope_or_symptom_or_expectation",
+          "triggered": true,
+          "evidence": "1. 改哪个登录？ ... 2. 要改什么？ ... 3. 期望怎么验收？"
+        },
+        {
+          "discriminator": "offers_concrete_options_to_pick_from",
+          "triggered": true,
+          "evidence": "A. 用户端登录  B. 管理后台登录  C. API 登录接口"
+        },
+        {
+          "discriminator": "no_implementation_code_before_clarification",
+          "triggered": true,
+          "evidence": "现在信息不够，而且当前 sandbox 里没有业务源码可直接定位登录实现"
+        }
+      ]
+    }
+  },
+  "total_discriminators": 4
+}

@@ -1,0 +1,21 @@
+我会按安全审计来做，先读 `security-best-practices` 和 `ec` 的流程要求，然后从 Flask 入口、路由注册、数据库访问链路往下取证，最后按风险等级给出结论和文件行号。
+技能里要求先找项目契约和安全参考。我现在会快速列目录、确认是否有 `CLAUDE.md/AGENTS.md`，再加载 Python/Flask 相关安全参考和应用代码。
+当前目录没有发现项目契约文件；刚才 `rg --files` 也没有列出文件，可能是目录结构特殊或文件在子目录外。我会用 `find/ls` 重新确认实际文件布局，同时加载 Flask 安全参考。
+这个工作目录本身只有隐藏的 agent/git 元数据，没有 `app.py`、`routes/`、`db/` 文件。因为用户明确点名了这些路径，我会继续查 git 状态和上层目录，确认源码是否在相邻位置或 worktree 配置里。
+`git rev-parse` 指向 `/root/skk`，当前 eval 子目录是空的未跟踪目录。为了不误判，我会在 `/root/skk` 范围内定位 Flask 源码；如果没有命中，我会明确说明无法做实质审计。
+在 `/root/skk` 下没有找到 `app.py`、`routes/`、`db/`，目前还看不到可审计的 Flask 应用代码。最后我会检查 eval 结果目录里是否用符号链接或非普通文件挂载了源码。
+我确认到 `20260521-071227-no-baseline` 里只有 eval1 的 JS 示例代码，`sandbox-eval2-with` 是空目录，且这一批结果下没有 Flask 文件。为了排除评测记录里藏了源码路径，我会看一下 summary/output 文件的元信息。
+我没有看到 Flask 源码，不会基于不存在的文件编造漏洞。最后再用 `git ls-files` 针对 `app.py/routes/db` 做一次确认，确保不是 `find` 漏掉了 tracked 文件。
+**结论**
+
+我没法对这个 Flask 应用给出真实漏洞清单，因为当前工作目录里没有你描述的源码。已确认：
+
+- 当前目录：`/root/skk/evals/results/20260521-071227-no-baseline/sandbox-eval2-with`
+- `find . -maxdepth 4` 只看到 `.agents`、`.codex`、`.git`
+- `git -C /root/skk ls-files 'app.py' 'routes/**' 'db/**' '**/app.py' '**/routes/**' '**/db/**'` 无输出
+- `/root/skk` 下 tracked 的 Python 文件只有 `evals/run.py`
+- `/root/skk/evals/results` 范围内也没有 `app.py`、`routes/`、`db/`
+
+所以这里的准确判断是：**审计对象缺失，不是“未发现漏洞”**。我也没有运行 Bandit/依赖审计，因为没有 Flask 源码或依赖清单可扫。
+
+拿到实际 `app.py`、`routes/`、`db/` 后，我会重点按这些项出具带 `file:line` 的 findings：`debug=True`/硬编码 `SECRET_KEY`、会话 cookie 配置、CSRF、认证与 IDOR、SQL 注入、模板/XSS/SSTI、文件路径穿越、SSRF/open redirect、错误信息泄露、CORS 与安全响应头。

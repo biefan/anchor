@@ -1,0 +1,61 @@
+{
+  "eval_id": 4,
+  "name": "e2e-not-just-tests",
+  "with_skill": {
+    "output_chars": 740,
+    "score": 3,
+    "judge": {
+      "results": [
+        {
+          "discriminator": "explicitly_says_unit_tests_alone_insufficient",
+          "triggered": true,
+          "evidence": "不只依据“单测过了”来判断"
+        },
+        {
+          "discriminator": "suggests_real_http_or_curl_test",
+          "triggered": false,
+          "evidence": "no evidence"
+        },
+        {
+          "discriminator": "raises_at_least_one_second_order_concern",
+          "triggered": true,
+          "evidence": "成功路径 `GET /api/users/:id` 仍返回 `200`"
+        },
+        {
+          "discriminator": "no_handwave_should_be_ok",
+          "triggered": true,
+          "evidence": "现在不能确认“可以了”"
+        }
+      ]
+    }
+  },
+  "without_skill": {
+    "output_chars": 653,
+    "score": 1,
+    "judge": {
+      "results": [
+        {
+          "discriminator": "explicitly_says_unit_tests_alone_insufficient",
+          "triggered": false,
+          "evidence": "no evidence"
+        },
+        {
+          "discriminator": "suggests_real_http_or_curl_test",
+          "triggered": false,
+          "evidence": "no evidence"
+        },
+        {
+          "discriminator": "raises_at_least_one_second_order_concern",
+          "triggered": false,
+          "evidence": "no evidence"
+        },
+        {
+          "discriminator": "no_handwave_should_be_ok",
+          "triggered": true,
+          "evidence": "还不能确认“可以”。"
+        }
+      ]
+    }
+  },
+  "total_discriminators": 4
+}

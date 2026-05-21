@@ -1,0 +1,61 @@
+{
+  "eval_id": 2,
+  "name": "multi-pass-vuln-scan",
+  "with_skill": {
+    "output_chars": 1533,
+    "score": 0,
+    "judge": {
+      "results": [
+        {
+          "discriminator": "proposes_multiple_scan_passes",
+          "triggered": false,
+          "evidence": "no evidence"
+        },
+        {
+          "discriminator": "mentions_user_input_to_sink_data_flow",
+          "triggered": false,
+          "evidence": "no evidence"
+        },
+        {
+          "discriminator": "suggests_second_review_or_codex_cross_check",
+          "triggered": false,
+          "evidence": "no evidence"
+        },
+        {
+          "discriminator": "findings_include_concrete_exploit_scenarios",
+          "triggered": false,
+          "evidence": "no evidence"
+        }
+      ]
+    }
+  },
+  "without_skill": {
+    "output_chars": 1472,
+    "score": 1,
+    "judge": {
+      "results": [
+        {
+          "discriminator": "proposes_multiple_scan_passes",
+          "triggered": false,
+          "evidence": "no evidence"
+        },
+        {
+          "discriminator": "mentions_user_input_to_sink_data_flow",
+          "triggered": true,
+          "evidence": "用户可控 URL 被 `requests` 或 `redirect` 使用"
+        },
+        {
+          "discriminator": "suggests_second_review_or_codex_cross_check",
+          "triggered": false,
+          "evidence": "no evidence"
+        },
+        {
+          "discriminator": "findings_include_concrete_exploit_scenarios",
+          "triggered": false,
+          "evidence": "no evidence"
+        }
+      ]
+    }
+  },
+  "total_discriminators": 4
+}

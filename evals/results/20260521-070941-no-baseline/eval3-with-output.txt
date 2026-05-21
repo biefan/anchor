@@ -1,0 +1,3 @@
+我会把这条作为一条 ad hoc memory note 追加到记忆扩展目录，内容只记录坑点、触发条件和修复方式，不改已有 memory 文件。
+已记录到 memory ad hoc note：`20260521T070956Z-redis-cluster-pipeline-cross-slot.md`。
+

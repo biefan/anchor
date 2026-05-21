@@ -1,0 +1,15 @@
+我先看一下这次改动和对应测试覆盖，再判断是否足够。会尽量只读检查，必要时跑相关测试确认。
+当前目录下没有看到 `src/api/users.ts` 的 git diff，`rg` 也没扫到目标路径；我继续确认仓库结构和实际文件位置，避免在错目录下判断。
+这里的 `sandbox-eval4-without` 目录实际只有空的 `.git/.codex/.agents` 目录，没有 `src`、`package.json` 或测试文件。为了给出明确结论，我再确认一下 git 索引和父级记录里是否有对应文件。
+还不能确认“可以”。
+
+我在当前目录 `/root/skk/evals/results/20260521-071227-no-baseline/sandbox-eval4-without` 查了：
+
+- 没有 `src/api/users.ts`
+- 没有 `package.json` 或测试文件
+- `git diff -- src/api/users.ts` 为空
+- `find /root/skk -path '*src/api/users.ts'` 没找到目标文件
+
+所以我无法复核你的修复，也没法确认测试是否覆盖了“用户不存在时必须返回 HTTP 404 而不是 200”。
+
+如果实际代码在别的目录，把路径给我；我会重点看两点：缺失用户分支是否显式 `status(404)`，以及是否有回归测试断言 `GET /api/users/:id` 对不存在 ID 返回 `404`。
