@@ -1,5 +1,8 @@
 # anchor
 
+[![CI](https://github.com/biefan/anchor/actions/workflows/ci.yml/badge.svg)](https://github.com/biefan/anchor/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 **English** | [中文](README.md)
 
 > Engineering discipline for Claude Code & Codex CLI: a skill + 7 slash commands + 4 safety hooks that keep AI on-task, prevent drift, and don't stop until the job is done.
@@ -246,9 +249,10 @@ Removes `~/.claude/skills/efficient-coding/` and the 7 `~/.claude/commands/*.md`
 
 Design references:
 
-- [Anthropic Agent Skills](https://github.com/anthropics/skills) — official skill examples (`skill-creator`, `claude-api`)
+- [anthropics/skills](https://github.com/anthropics/skills) — official skill examples (`skill-creator`, `claude-api`)
 - [openai/codex-plugin-cc](https://github.com/openai/codex-plugin-cc) — `stop-review-gate` hook pattern
-- Anthropic Claude Code marketplace's `silent-failure-hunter`, `security-auditor`, `code-reviewer` sub-agents
+- Anthropic [claude-plugins-official/pr-review-toolkit](https://github.com/anthropics/claude-plugins-official/tree/main/plugins/pr-review-toolkit) — silent-failure-hunter / code-reviewer / code-simplifier and 3 other PR review agents
+- Anthropic [claude-plugins-official/code-modernization](https://github.com/anthropics/claude-plugins-official/tree/main/plugins/code-modernization) — `security-auditor` agent
 
 ## License
 

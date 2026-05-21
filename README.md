@@ -1,5 +1,8 @@
 # anchor
 
+[![CI](https://github.com/biefan/anchor/actions/workflows/ci.yml/badge.svg)](https://github.com/biefan/anchor/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 [English](README.en.md) | **中文**
 
 > Claude Code / Codex CLI 的工程化纪律：skill + 7 个 slash commands + 4 个安全 hooks，让 AI 写代码"少走错路、不偏题、跑到完为止"。
@@ -250,9 +253,10 @@ codex plugin add anchor@anchor
 ## 致谢与参考
 
 设计参考：
-- [Anthropic Agent Skills](https://github.com/anthropics/skills) 的官方 skill 模板（`skill-creator`、`claude-api`）
-- [openai/codex-plugin-cc](https://github.com/openai/codex-plugin-cc) 的 stop-review-gate hook 实现
-- [pr-review-toolkit](https://github.com/anthropics/claude-code-marketplace) 的 silent-failure-hunter / security-auditor / code-reviewer agents
+- [anthropics/skills](https://github.com/anthropics/skills) 的官方 skill 范例（`skill-creator`、`claude-api`）
+- [openai/codex-plugin-cc](https://github.com/openai/codex-plugin-cc) 的 `stop-review-gate` hook 实现
+- Anthropic [claude-plugins-official/pr-review-toolkit](https://github.com/anthropics/claude-plugins-official/tree/main/plugins/pr-review-toolkit) 的 silent-failure-hunter / code-reviewer / code-simplifier 等 6 个 PR review agents
+- Anthropic [claude-plugins-official/code-modernization](https://github.com/anthropics/claude-plugins-official/tree/main/plugins/code-modernization) 的 `security-auditor` agent
 
 ## License
 
