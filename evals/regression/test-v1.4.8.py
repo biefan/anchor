@@ -5,7 +5,7 @@ Fix: check_git_config_injection now also runs pipeline-to-shell detection
 on the value, not just per-stage scan.
 """
 import json, subprocess, sys
-HOOK = "skills/efficient-coding/scripts/pre-tool-danger.sh"
+HOOK = "skills/anchor/scripts/pre-tool-danger.sh"
 
 TESTS = [
     # The reported bug

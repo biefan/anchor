@@ -1,5 +1,5 @@
 #!/bin/bash
-HOOK=skills/efficient-coding/scripts/pre-tool-danger.sh
+HOOK=skills/anchor/scripts/pre-tool-danger.sh
 
 # Tests use :: delimiter so | inside cmds is safe.
 TESTS=(

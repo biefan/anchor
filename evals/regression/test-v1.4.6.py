@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """v1.4.6 — mv to block device + git -c '!shell' prefix."""
 import json, subprocess, sys
-HOOK = "skills/efficient-coding/scripts/pre-tool-danger.sh"
+HOOK = "skills/anchor/scripts/pre-tool-danger.sh"
 
 TESTS = [
     ("BLOCK", "mv /tmp/img /dev/sda", "mv to /dev/sda"),

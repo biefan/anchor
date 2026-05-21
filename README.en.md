@@ -67,7 +67,7 @@ anchor/
 ├── .codex-plugin/plugin.json          # Codex CLI plugin manifest
 ├── hooks/hooks.json                   # 4 hooks for plugin-based install
 ├── skills/
-│   └── efficient-coding/
+│   └── anchor/
 │       ├── SKILL.md                   # core 7 rules + long-task mode + autonomous + E2E + vuln scan + review + pitfall writeback
 │       ├── references/                # detailed guides loaded on demand
 │       │   ├── autonomous-mode.md     # autonomous protocol
@@ -126,7 +126,7 @@ rm ~/.claude/.efficient-coding-autonomous
 **Good for**: a single bounded task you want completed in one shot
 **Not for**: exploratory conversation, decisions you want to discuss as you go
 
-Full protocol: [`references/autonomous-mode.md`](skills/efficient-coding/references/autonomous-mode.md)
+Full protocol: [`references/autonomous-mode.md`](skills/anchor/references/autonomous-mode.md)
 
 ## Design principles
 
@@ -171,7 +171,7 @@ This pack runs on **OpenAI Codex CLI** (0.130+) — it shares the [agentskills.i
 
 ```bash
 mkdir -p ~/.codex/skills/ec
-cp -r skills/efficient-coding/{SKILL.md,references,scripts} ~/.codex/skills/ec/
+cp -r skills/anchor/{SKILL.md,references,scripts} ~/.codex/skills/ec/
 ```
 
 ### Verify
@@ -259,7 +259,7 @@ New users → **plugin install recommended**. Existing `install.sh` users: hooks
 ./uninstall.sh
 ```
 
-Removes `~/.claude/skills/efficient-coding/`, all 11 `~/.claude/commands/*.md`, and any anchor skill dirs under `~/.codex/skills/` if present. **Home-scheme anchor hook entries in `settings.json` are automatically cleaned** (with a timestamped backup); plugin-marketplace hook entries are left alone by default — they're owned by the plugin system. Pass `--all-hooks` to clear plugin-scheme entries too.
+Removes `~/.claude/skills/anchor/`, all 11 `~/.claude/commands/*.md`, and any anchor skill dirs under `~/.codex/skills/` if present. **Home-scheme anchor hook entries in `settings.json` are automatically cleaned** (with a timestamped backup); plugin-marketplace hook entries are left alone by default — they're owned by the plugin system. Pass `--all-hooks` to clear plugin-scheme entries too.
 
 ## Credits
 

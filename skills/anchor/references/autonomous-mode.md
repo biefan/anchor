@@ -2,7 +2,7 @@
 
 ## 是什么
 
-启用 autonomous mode 后，efficient-coding skill 进入"长跑模式"：
+启用 autonomous mode 后，anchor skill 进入"长跑模式"：
 - **任务清单未清空前不停**——Stop hook 会拦截，让你继续推进
 - **遇到障碍自主排查**——不动不动就停下问用户
 - **真卡死才报告**——按"观察 → 假设 → 验证"穷尽 3 轮假设仍无进展才停

@@ -124,7 +124,7 @@ User-reported patch (round 7). Two findings:
 
 ### Verified — 136 / 136 across 7 suites
 
-shellcheck PASS, jsonlint PASS, fresh-install dry-run confirms `analyze-events.py` lands at `~/.claude/skills/efficient-coding/scripts/`.
+shellcheck PASS, jsonlint PASS, fresh-install dry-run confirms `analyze-events.py` lands at `~/.claude/skills/anchor/scripts/`.
 
 ### Plugin manifest
 
@@ -468,7 +468,7 @@ Second-pass codex adversarial-review patch. **Major version bump because `pre-to
 - **B12, B13 read-modify-write lock**: both install.sh's merge branch and uninstall.sh wrap settings.json access in `fcntl.flock(LOCK_EX)`. Concurrent installs / uninstalls now serialize cleanly instead of stomping on each other.
 - **B14, B15 preserve original mode**: `tempfile.mkstemp` defaults to mode 0o600; previously `os.replace` would silently widen restrictive permissions or narrow generous ones. Both install.sh and uninstall.sh now `os.chmod(tmp, orig_mode)` before replacing, capturing the original mode via `stat.S_IMODE(os.stat(target).st_mode)`.
 - **B16 uninstall ordering**: settings.json is cleaned **first**; only on success are script files removed. If JSON parsing / permission / replace fails, no files are deleted, so settings.json's hook entries still point at real scripts. Previously the order was reversed — a settings clean failure would have left hooks pointing at deleted scripts.
-- **B18 hook-path-source filter**: by default uninstall only removes hook entries whose path matches `$HOME/.claude/skills/efficient-coding/...` (the install.sh-managed scheme). Plugin-marketplace hooks (`${CLAUDE_PLUGIN_ROOT}/...`) are left alone — they're owned by the plugin system and removing the plugin should clean them. New `--all-hooks` flag opts into clearing both.
+- **B18 hook-path-source filter**: by default uninstall only removes hook entries whose path matches `$HOME/.claude/skills/anchor/...` (the install.sh-managed scheme). Plugin-marketplace hooks (`${CLAUDE_PLUGIN_ROOT}/...`) are left alone — they're owned by the plugin system and removing the plugin should clean them. New `--all-hooks` flag opts into clearing both.
 
 ### 🟢 Backup naming (B19)
 
@@ -544,7 +544,7 @@ Codex adversarial-review patch. After v1.3.7, codex did its own independent audi
 - **`ec-status.sh` heredoc `$task_dir` (A6)**: same pattern as v1.3.7's stop-self-check fix, but in the statusline script that v1.3.7 missed. Now uses `EC_TASK_DIR` env var + `<<'PYEOF'` quoted heredoc.
 - **`pre-tool-danger.sh` shared marker file (A7)**: `~/.claude/.ec-last-pretool-block` is a global path; two concurrent PreToolUse invocations could overwrite each other's block decision. Now uses `mktemp /tmp/.ec-pretool-block.XXXXXX` per invocation + `trap` cleanup.
 - **`install.sh` non-atomic settings.json write (A8)**: both branches now write to `tempfile.mkstemp` in the same dir then `os.replace` — atomic on POSIX.
-- **`uninstall.sh` left orphaned hook entries (A9)**: uninstall now also scrubs `settings.json` of any hook entry whose `command` matches `efficient-coding/scripts/X.sh`, with atomic replace and a timestamp backup.
+- **`uninstall.sh` left orphaned hook entries (A9)**: uninstall now also scrubs `settings.json` of any hook entry whose `command` matches `anchor/scripts/X.sh`, with atomic replace and a timestamp backup.
 - **`evals/run.py` baseline skill-hiding list went stale (A10)**: `SKILLS_TO_HIDE` was hardcoded with 8 names from v1.0; now derived from `commands/*.md` so it auto-syncs (currently 12 entries).
 - **`evals/run.py` `/tmp/anchor-skills-hidden-<秒>` collision + dangerous restore (A11)**: now uses `tempfile.mkdtemp` + restore only moves skills whose backup file still exists, and refuses to overwrite a present target.
 - **`evals/stress/grade.py` `rglob` stalled on huge dep trees (A12)**: replaced with `os.walk` that prunes `skip_dirs` in-place — never descends into the big trees.
@@ -896,9 +896,9 @@ First stable release. The repo went through 5 iteration rounds within a single c
 
 #### v0.1 — initial commit
 
-- `skills/efficient-coding/SKILL.md` — 7 core rules + long-task mode + autonomous mode + E2E + multi-pass vuln scan + condition-based codex review + project-CLAUDE.md pitfall writeback.
-- `skills/efficient-coding/references/` — 4 reference files: `autonomous-mode.md`, `pitfall-template.md`, `vuln-checklist.md`, `multi-agent-recipes.md`.
-- `skills/efficient-coding/scripts/` — `session-start-inject.sh`, `stop-self-check.sh`.
+- `skills/anchor/SKILL.md` — 7 core rules + long-task mode + autonomous mode + E2E + multi-pass vuln scan + condition-based codex review + project-CLAUDE.md pitfall writeback.
+- `skills/anchor/references/` — 4 reference files: `autonomous-mode.md`, `pitfall-template.md`, `vuln-checklist.md`, `multi-agent-recipes.md`.
+- `skills/anchor/scripts/` — `session-start-inject.sh`, `stop-self-check.sh`.
 - `commands/` — `lock-scope.md`, `record-pitfall.md`, `scan-deeper.md` (later renamed in v0.2).
 - `install.sh` / `uninstall.sh` — file-copy install to `~/.claude/`.
 - `settings.hooks.json` — manual merge template for `~/.claude/settings.json`.

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Stop hook for efficient-coding autonomous mode
+# Stop hook for anchor autonomous mode
 # Blocks stop if the current session's task list still has pending/in_progress items.
 # Hook contract: read JSON from stdin, write JSON or exit code to control stop.
 # Only active when ~/.claude/.efficient-coding-autonomous exists.
@@ -82,13 +82,13 @@ incomplete = os.environ.get("EC_STOP_INCOMPLETE", "")
 reason = (
     "Autonomous mode is ON — task list still has incomplete items:\n\n"
     f"{incomplete}\n\n"
-    "By the efficient-coding skill's autonomous-mode rules:\n"
+    "By the anchor skill's autonomous-mode rules:\n"
     "1. Do not stop. Continue working on the next pending task.\n"
     "2. If blocked, use 观察 → 假设 → 验证: state the observation, propose one hypothesis, "
     "design a minimal test to refute/confirm. Iterate up to 3 hypotheses before reporting.\n"
     "3. Only report a true blocker when you've exhausted self-resolution OR you genuinely need a "
     "user decision (high-cost action, ambiguous business choice, missing credential).\n"
-    "4. See ~/.claude/skills/efficient-coding/references/autonomous-mode.md for the full protocol.\n\n"
+    "4. See ~/.claude/skills/anchor/references/autonomous-mode.md for the full protocol.\n\n"
     "To override and stop anyway: `rm ~/.claude/.efficient-coding-autonomous` then end."
 )
 print(json.dumps({"decision": "block", "reason": reason}))

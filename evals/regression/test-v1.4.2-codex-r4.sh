@@ -1,6 +1,6 @@
 #!/bin/bash
 # Regression suite for codex r4 findings E1-E11.
-HOOK=skills/efficient-coding/scripts/pre-tool-danger.sh
+HOOK=skills/anchor/scripts/pre-tool-danger.sh
 
 TESTS=(
     "BLOCK::rm -rf /e*::E1 glob /e* expanding to /etc"

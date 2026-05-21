@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/skills/efficient-coding/scripts/session-start-inject.sh\"",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/skills/anchor/scripts/session-start-inject.sh\"",
             "timeout": 5
           }
         ]
@@ -17,7 +17,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/skills/efficient-coding/scripts/stop-self-check.sh\"",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/skills/anchor/scripts/stop-self-check.sh\"",
             "timeout": 10
           }
         ]
@@ -28,7 +28,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/skills/efficient-coding/scripts/pre-tool-danger.sh\"",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/skills/anchor/scripts/pre-tool-danger.sh\"",
             "timeout": 5
           }
         ]
@@ -39,7 +39,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/skills/efficient-coding/scripts/post-tool-lint.sh\"",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/skills/anchor/scripts/post-tool-lint.sh\"",
             "timeout": 15
           }
         ]

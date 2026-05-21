@@ -47,7 +47,7 @@ mkdir -p /tmp/anchor-stress-run-$(date +%s) && cd /tmp/anchor-stress-run-*
 After any stress test, run:
 
 ```bash
-python3 ~/anchor/skills/efficient-coding/scripts/analyze-events.py --all > /tmp/anchor-events-this-run.md
+python3 ~/anchor/skills/anchor/scripts/analyze-events.py --all > /tmp/anchor-events-this-run.md
 git -C /tmp/anchor-stress-run-* status --short
 git -C /tmp/anchor-stress-run-* diff --stat
 ls /tmp/anchor-stress-run-*/CLAUDE.md 2>&1

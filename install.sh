@@ -1,5 +1,5 @@
 #!/bin/bash
-# Install anchor (efficient-coding skill + 7 slash commands + 4 safety hooks)
+# Install anchor (skill + 11 slash commands + 4 safety hooks)
 # - Always installs to ~/.claude/ (Claude Code)
 # - If `codex` CLI is detected, also installs to ~/.codex/
 # - By default merges hook config into ~/.claude/settings.json (timestamped backup)
@@ -72,15 +72,15 @@ except OSError:
 fi
 
 # ---- 1. Claude Code: skill + commands ----
-mkdir -p "$CLAUDE_DIR/skills/efficient-coding/references"
-mkdir -p "$CLAUDE_DIR/skills/efficient-coding/scripts"
+mkdir -p "$CLAUDE_DIR/skills/anchor/references"
+mkdir -p "$CLAUDE_DIR/skills/anchor/scripts"
 mkdir -p "$CLAUDE_DIR/commands"
 
-cp "$SCRIPT_DIR/skills/efficient-coding/SKILL.md" "$CLAUDE_DIR/skills/efficient-coding/"
-cp "$SCRIPT_DIR/skills/efficient-coding/references/"*.md "$CLAUDE_DIR/skills/efficient-coding/references/"
-cp "$SCRIPT_DIR/skills/efficient-coding/scripts/"*.sh "$CLAUDE_DIR/skills/efficient-coding/scripts/"
-cp "$SCRIPT_DIR/skills/efficient-coding/scripts/"*.py "$CLAUDE_DIR/skills/efficient-coding/scripts/"
-chmod +x "$CLAUDE_DIR/skills/efficient-coding/scripts/"*.sh "$CLAUDE_DIR/skills/efficient-coding/scripts/"*.py
+cp "$SCRIPT_DIR/skills/anchor/SKILL.md" "$CLAUDE_DIR/skills/anchor/"
+cp "$SCRIPT_DIR/skills/anchor/references/"*.md "$CLAUDE_DIR/skills/anchor/references/"
+cp "$SCRIPT_DIR/skills/anchor/scripts/"*.sh "$CLAUDE_DIR/skills/anchor/scripts/"
+cp "$SCRIPT_DIR/skills/anchor/scripts/"*.py "$CLAUDE_DIR/skills/anchor/scripts/"
+chmod +x "$CLAUDE_DIR/skills/anchor/scripts/"*.sh "$CLAUDE_DIR/skills/anchor/scripts/"*.py
 cp "$SCRIPT_DIR/commands/"*.md "$CLAUDE_DIR/commands/"
 echo "  ✓ Claude Code: skill + 11 commands"
 
@@ -98,9 +98,9 @@ replace_plugin_hooks = os.environ.get("REPLACE_PLUGIN_HOOKS") == "1"
 # Dedup keys: scheme-aware so we distinguish a hook installed via the plugin
 # marketplace path from one installed by ./install.sh. (flock is held by the
 # parent bash script on ~/.claude/.anchor.lock — no need to flock here.)
-ANCHOR_SCRIPT_PAT = re.compile(r"efficient-coding/scripts/([\w.-]+\.sh)")
+ANCHOR_SCRIPT_PAT = re.compile(r"(?:efficient-coding|anchor)/scripts/([\w.-]+\.sh)")
 PLUGIN_PATH_PAT = re.compile(r"\$\{?CLAUDE_PLUGIN_ROOT\}?")
-HOME_PATH_PAT = re.compile(r"(?:\$\{?HOME\}?|~)/\.claude/skills/efficient-coding/")
+HOME_PATH_PAT = re.compile(r"(?:\$\{?HOME\}?|~)/\.claude/skills/anchor/")
 
 def anchor_key(cmd):
     m = ANCHOR_SCRIPT_PAT.search(cmd)
@@ -233,13 +233,13 @@ fi
 
 # ---- 3. Codex CLI (if installed) ----
 if command -v codex >/dev/null 2>&1 && [ -d "$CODEX_DIR" ]; then
-    mkdir -p "$CODEX_DIR/skills/ec/references"
-    mkdir -p "$CODEX_DIR/skills/ec/scripts"
-    cp "$SCRIPT_DIR/skills/efficient-coding/SKILL.md" "$CODEX_DIR/skills/ec/"
-    cp "$SCRIPT_DIR/skills/efficient-coding/references/"*.md "$CODEX_DIR/skills/ec/references/"
-    cp "$SCRIPT_DIR/skills/efficient-coding/scripts/"*.sh "$CODEX_DIR/skills/ec/scripts/"
-    cp "$SCRIPT_DIR/skills/efficient-coding/scripts/"*.py "$CODEX_DIR/skills/ec/scripts/"
-    chmod +x "$CODEX_DIR/skills/ec/scripts/"*.sh "$CODEX_DIR/skills/ec/scripts/"*.py
+    mkdir -p "$CODEX_DIR/skills/anchor/references"
+    mkdir -p "$CODEX_DIR/skills/anchor/scripts"
+    cp "$SCRIPT_DIR/skills/anchor/SKILL.md" "$CODEX_DIR/skills/anchor/"
+    cp "$SCRIPT_DIR/skills/anchor/references/"*.md "$CODEX_DIR/skills/anchor/references/"
+    cp "$SCRIPT_DIR/skills/anchor/scripts/"*.sh "$CODEX_DIR/skills/anchor/scripts/"
+    cp "$SCRIPT_DIR/skills/anchor/scripts/"*.py "$CODEX_DIR/skills/anchor/scripts/"
+    chmod +x "$CODEX_DIR/skills/anchor/scripts/"*.sh "$CODEX_DIR/skills/anchor/scripts/"*.py
     for cmd in lock pit scan "done" next recap init-claude-md status ship diff cleanup; do
         mkdir -p "$CODEX_DIR/skills/$cmd"
         cp "$SCRIPT_DIR/commands/$cmd.md" "$CODEX_DIR/skills/$cmd/SKILL.md"

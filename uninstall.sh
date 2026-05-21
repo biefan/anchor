@@ -71,8 +71,8 @@ from pathlib import Path
 
 # flock is held by the parent bash script on ~/.claude/.anchor.lock; no need
 # to flock here. v1.4.1: removing the inode-level flock that os.replace bypassed.
-ANCHOR_SCRIPT_PAT = re.compile(r"efficient-coding/scripts/[\w.-]+\.sh")
-HOME_PATH_PAT = re.compile(r"(?:\$\{?HOME\}?|~)/\.claude/skills/efficient-coding/")
+ANCHOR_SCRIPT_PAT = re.compile(r"(?:efficient-coding|anchor)/scripts/[\w.-]+\.sh")
+HOME_PATH_PAT = re.compile(r"(?:\$\{?HOME\}?|~)/\.claude/skills/anchor/")
 PLUGIN_PATH_PAT = re.compile(r"\$\{?CLAUDE_PLUGIN_ROOT\}?")
 all_hooks = os.environ.get("ALL_HOOKS") == "1"
 
@@ -92,7 +92,7 @@ def should_remove(cmd):
     if all_hooks:
         return True
     # Default: ONLY remove hooks whose path is the home-scheme install
-    # ($HOME/.claude/skills/efficient-coding/...). Plugin-managed and any
+    # ($HOME/.claude/skills/anchor/...). Plugin-managed and any
     # unknown-scheme paths (custom wrappers, third-party install layouts)
     # are left intact. --all-hooks opts into the broader sweep.
     return bool(HOME_PATH_PAT.search(cmd))
@@ -143,13 +143,13 @@ fi
 # ---- 2. Now safe to remove script files. ----
 # Skill
 if [ -d "$CLAUDE_DIR/skills/efficient-coding" ]; then
-    echo "→ Removing $CLAUDE_DIR/skills/efficient-coding/"
-    rm -f "$CLAUDE_DIR/skills/efficient-coding/SKILL.md"
-    rm -f "$CLAUDE_DIR/skills/efficient-coding/references/"*.md
-    rm -f "$CLAUDE_DIR/skills/efficient-coding/scripts/"*.sh
-    rm -f "$CLAUDE_DIR/skills/efficient-coding/scripts/"*.py
-    rmdir "$CLAUDE_DIR/skills/efficient-coding/references" 2>/dev/null || true
-    rmdir "$CLAUDE_DIR/skills/efficient-coding/scripts" 2>/dev/null || true
+    echo "→ Removing $CLAUDE_DIR/skills/anchor/"
+    rm -f "$CLAUDE_DIR/skills/anchor/SKILL.md"
+    rm -f "$CLAUDE_DIR/skills/anchor/references/"*.md
+    rm -f "$CLAUDE_DIR/skills/anchor/scripts/"*.sh
+    rm -f "$CLAUDE_DIR/skills/anchor/scripts/"*.py
+    rmdir "$CLAUDE_DIR/skills/anchor/references" 2>/dev/null || true
+    rmdir "$CLAUDE_DIR/skills/anchor/scripts" 2>/dev/null || true
     rmdir "$CLAUDE_DIR/skills/efficient-coding" 2>/dev/null || true
 fi
 
@@ -169,13 +169,13 @@ fi
 
 # Codex CLI install (if present)
 if [ -d "$CODEX_DIR/skills/ec" ]; then
-    echo "→ Removing $CODEX_DIR/skills/ec/"
-    rm -f "$CODEX_DIR/skills/ec/SKILL.md"
-    rm -f "$CODEX_DIR/skills/ec/references/"*.md
-    rm -f "$CODEX_DIR/skills/ec/scripts/"*.sh
-    rm -f "$CODEX_DIR/skills/ec/scripts/"*.py
-    rmdir "$CODEX_DIR/skills/ec/references" 2>/dev/null || true
-    rmdir "$CODEX_DIR/skills/ec/scripts" 2>/dev/null || true
+    echo "→ Removing $CODEX_DIR/skills/anchor/"
+    rm -f "$CODEX_DIR/skills/anchor/SKILL.md"
+    rm -f "$CODEX_DIR/skills/anchor/references/"*.md
+    rm -f "$CODEX_DIR/skills/anchor/scripts/"*.sh
+    rm -f "$CODEX_DIR/skills/anchor/scripts/"*.py
+    rmdir "$CODEX_DIR/skills/anchor/references" 2>/dev/null || true
+    rmdir "$CODEX_DIR/skills/anchor/scripts" 2>/dev/null || true
     rmdir "$CODEX_DIR/skills/ec" 2>/dev/null || true
 fi
 # Codex commands-as-skills

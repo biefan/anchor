@@ -1,5 +1,5 @@
 import json, subprocess, sys
-HOOK = "skills/efficient-coding/scripts/pre-tool-danger.sh"
+HOOK = "skills/anchor/scripts/pre-tool-danger.sh"
 
 TESTS = [
     # Git destructive

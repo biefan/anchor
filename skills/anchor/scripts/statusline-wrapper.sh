@@ -5,7 +5,7 @@
 #   2. In ~/.claude/settings.json, set:
 #      "statusLine": {
 #        "type": "command",
-#        "command": "bash \"$HOME/.claude/skills/efficient-coding/scripts/statusline-wrapper.sh\""
+#        "command": "bash \"$HOME/.claude/skills/anchor/scripts/statusline-wrapper.sh\""
 #      }
 # If you're not using ccstatusline, edit MAIN below to your own statusline command.
 
@@ -25,7 +25,7 @@ else
 fi
 
 # EC: append our status
-ec=$(echo "$input" | bash "$HOME/.claude/skills/efficient-coding/scripts/ec-status.sh" 2>/dev/null)
+ec=$(echo "$input" | bash "$HOME/.claude/skills/anchor/scripts/ec-status.sh" 2>/dev/null)
 
 # Print combined
 if [ -n "$ec" ]; then

@@ -1,12 +1,12 @@
 ---
-description: 漏洞扫描深入挖一遍——按 efficient-coding skill 的多遍扫方法论再扫一轮。Use when initial vuln scan finds 0 or few issues, or before declaring a security audit complete.
+description: 漏洞扫描深入挖一遍——按 anchor skill 的多遍扫方法论再扫一轮。Use when initial vuln scan finds 0 or few issues, or before declaring a security audit complete.
 argument-hint: "[可选：聚焦的子目录或语言，如 src/api/ 或 python]"
 ---
 
-按 `efficient-coding` skill 的"漏洞扫描：多遍扫，扫到为止"方法论深扫一轮。
+按 `anchor` skill 的"漏洞扫描：多遍扫，扫到为止"方法论深扫一轮。
 
 详细 grep / 工具命令 / coverage checklist 参考：
-`~/.claude/skills/efficient-coding/references/vuln-checklist.md`
+`~/.claude/skills/anchor/references/vuln-checklist.md`
 
 执行：
 
@@ -33,4 +33,4 @@ argument-hint: "[可选：聚焦的子目录或语言，如 src/api/ 或 python]
    - 跑完前 3 遍 + 一次 codex 交叉 + 连续两遍只 surface 已知问题 + 满足 coverage checklist 适用项 → 报告"扫描完成"
    - 否则继续——只跑一遍说"扫完了"是错的
 
-**重要**：本命令只扫和报告，**不直接修漏洞**——修要单独的 task 走 efficient-coding 主流程（包括踩坑回写 CLAUDE.md）。
+**重要**：本命令只扫和报告，**不直接修漏洞**——修要单独的 task 走 anchor 主流程（包括踩坑回写 CLAUDE.md）。

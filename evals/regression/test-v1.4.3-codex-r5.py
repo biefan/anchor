@@ -4,7 +4,7 @@ import json
 import subprocess
 import sys
 
-HOOK = "skills/efficient-coding/scripts/pre-tool-danger.sh"
+HOOK = "skills/anchor/scripts/pre-tool-danger.sh"
 
 # (expected, cmd, description)
 TESTS = [

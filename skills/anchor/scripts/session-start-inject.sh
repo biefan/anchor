@@ -1,5 +1,5 @@
 #!/bin/bash
-# SessionStart hook for efficient-coding skill
+# SessionStart hook for anchor skill
 # Prints a short context block to stdout, which Claude Code injects into the session context.
 # Hook contract: read JSON from stdin, write text/JSON to stdout. Exit 0 = ok.
 
@@ -38,7 +38,7 @@ fi
 
 if [ -n "$contracts" ]; then
     echo "**Project contracts present**:$contracts"
-    echo "→ \`efficient-coding\` skill requires you read them before coding."
+    echo "→ \`anchor\` skill requires you read them before coding."
 else
     echo "**No project contracts found** in \`$cwd\`. Use neighbor files' actual style as the de facto standard."
 fi

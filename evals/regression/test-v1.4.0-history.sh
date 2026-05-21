@@ -5,7 +5,7 @@
 
 set +e
 
-HOOK=skills/efficient-coding/scripts/pre-tool-danger.sh
+HOOK=skills/anchor/scripts/pre-tool-danger.sh
 
 # Each entry: <expect>::<cmd>::<description>
 TESTS=(

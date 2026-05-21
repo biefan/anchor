@@ -64,7 +64,7 @@ anchor/
 ├── install.sh / uninstall.sh          # 一键安装/卸载
 ├── settings.hooks.json                # hooks 配置示例（要 merge 到自己的 settings.json）
 ├── skills/
-│   └── efficient-coding/
+│   └── anchor/
 │       ├── SKILL.md                   # 核心 skill（核心七条 + 长任务模式 + 验证 + 漏洞扫描 + 审查 + 踩坑回写）
 │       ├── references/                # 详细参考（按需读，不每次加载）
 │       │   ├── autonomous-mode.md     # 自治模式协议
@@ -123,7 +123,7 @@ rm ~/.claude/.efficient-coding-autonomous
 **适合**：用户给一个完整任务后想要"做完才停"
 **不适合**：探索性对话、需要边做边商量的决策
 
-详细协议见 [`references/autonomous-mode.md`](skills/efficient-coding/references/autonomous-mode.md)。
+详细协议见 [`references/autonomous-mode.md`](skills/anchor/references/autonomous-mode.md)。
 
 ## 设计原则
 
@@ -167,7 +167,7 @@ rm ~/.claude/.efficient-coding-autonomous
 
 ```bash
 mkdir -p ~/.codex/skills/ec
-cp -r skills/efficient-coding/{SKILL.md,references,scripts} ~/.codex/skills/ec/
+cp -r skills/anchor/{SKILL.md,references,scripts} ~/.codex/skills/ec/
 ```
 
 ### 用法
@@ -264,7 +264,7 @@ codex plugin add anchor@anchor
 ./uninstall.sh
 ```
 
-会移除 `~/.claude/skills/efficient-coding/`、11 个 `~/.claude/commands/*.md`，以及 `~/.codex/skills/` 下的所有 anchor skill 目录（如有）。**`settings.json` 里 home-scheme 的 anchor hook 条目会自动清掉**（带 timestamp backup）；plugin-marketplace 安装的 hook 条目默认保留——它们由 plugin 系统管理。要一并清掉 plugin-scheme hook 加 `--all-hooks` flag。
+会移除 `~/.claude/skills/anchor/`、11 个 `~/.claude/commands/*.md`，以及 `~/.codex/skills/` 下的所有 anchor skill 目录（如有）。**`settings.json` 里 home-scheme 的 anchor hook 条目会自动清掉**（带 timestamp backup）；plugin-marketplace 安装的 hook 条目默认保留——它们由 plugin 系统管理。要一并清掉 plugin-scheme hook 加 `--all-hooks` flag。
 
 ## 致谢与参考
 

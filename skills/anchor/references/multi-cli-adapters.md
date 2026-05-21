@@ -8,8 +8,8 @@ This doc shows how to plug anchor's `SKILL.md` content into each tool's project-
 
 | Tool | Rules file | Scope | Hot reload | Hooks support |
 |---|---|---|---|---|
-| **Claude Code** | `~/.claude/skills/efficient-coding/SKILL.md` | user (cross-project) | yes | ✅ full (4 hooks via `~/.claude/settings.json`) |
-| **Codex CLI** | `~/.codex/skills/ec/SKILL.md` | user (cross-project) | yes | ✅ full (via plugin install) |
+| **Claude Code** | `~/.claude/skills/anchor/SKILL.md` | user (cross-project) | yes | ✅ full (4 hooks via `~/.claude/settings.json`) |
+| **Codex CLI** | `~/.codex/skills/anchor/SKILL.md` | user (cross-project) | yes | ✅ full (via plugin install) |
 | **Cursor** | `<project>/.cursor/rules/anchor.mdc` | project | yes (on edit) | ❌ no native hook system |
 | **Cline** | `<project>/.clinerules` | project | yes | ❌ |
 | **Aider** | `<project>/AI_RULES.md` referenced from `.aider.conf.yml` | project | yes | partial (yes-no confirm prompts) |
@@ -23,7 +23,7 @@ Cursor uses `.cursor/rules/*.mdc` (Markdown-with-frontmatter) files in the proje
 ```bash
 cd <your-project>
 mkdir -p .cursor/rules
-cp ~/anchor/skills/efficient-coding/SKILL.md .cursor/rules/anchor.mdc
+cp ~/anchor/skills/anchor/SKILL.md .cursor/rules/anchor.mdc
 ```
 
 Then edit the file's frontmatter to be Cursor-style:
@@ -58,7 +58,7 @@ Cline reads `.clinerules` at the project root (plain markdown, no frontmatter).
 
 ```bash
 cd <your-project>
-cp ~/anchor/skills/efficient-coding/SKILL.md .clinerules
+cp ~/anchor/skills/anchor/SKILL.md .clinerules
 ```
 
 That's it. No frontmatter conversion needed — Cline ignores YAML it doesn't understand.
@@ -75,7 +75,7 @@ Aider reads `AI_RULES.md` if `~/.aider.conf.yml` (or project-level `.aider.conf.
 
 ```bash
 cd <your-project>
-cp ~/anchor/skills/efficient-coding/SKILL.md AI_RULES.md
+cp ~/anchor/skills/anchor/SKILL.md AI_RULES.md
 # Strip the YAML frontmatter — aider doesn't parse it as YAML, it shows raw
 # (Easiest: sed -i '1,/^---$/d' AI_RULES.md after the first --- block. Or open and delete the frontmatter manually.)
 
@@ -104,7 +104,7 @@ YAML
 
 If you primarily use **Claude Code or Codex CLI**: use the full anchor (`./install.sh`).
 If you also use Cursor / Cline / Aider on the same project: cp SKILL.md into the rules file for that tool (above). You'll get ~70% of anchor's value with no hooks, no commands.
-If your team uses several of these: keep the `~/anchor/skills/efficient-coding/SKILL.md` as the single source of truth and re-sync the project rules file when you upgrade anchor (e.g. via a `make sync-cursor-rules` Makefile target on your end).
+If your team uses several of these: keep the `~/anchor/skills/anchor/SKILL.md` as the single source of truth and re-sync the project rules file when you upgrade anchor (e.g. via a `make sync-cursor-rules` Makefile target on your end).
 
 ## What's NOT happening here
 

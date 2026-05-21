@@ -1,6 +1,6 @@
 # PreToolUse hook regression tests
 
-Per-audit-round regression suites for `skills/efficient-coding/scripts/pre-tool-danger.sh`.
+Per-audit-round regression suites for `skills/anchor/scripts/pre-tool-danger.sh`.
 
 | File | Origin | Count | Coverage |
 |---|---|---|---|
@@ -39,7 +39,7 @@ These are also wired into `.github/workflows/ci.yml` — the `pretool-regression
 
 When future audit rounds find new bypasses:
 
-1. Add fix to `skills/efficient-coding/scripts/pre-tool-danger.sh`
+1. Add fix to `skills/anchor/scripts/pre-tool-danger.sh`
 2. Add new test file `evals/regression/test-v<version>-<round>.{sh,py}` matching the pattern
 3. Update this README's table
 4. Reference the round in `CHANGELOG.md`

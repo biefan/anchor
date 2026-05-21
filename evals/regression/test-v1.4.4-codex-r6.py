@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 import json, subprocess, sys
-HOOK = "skills/efficient-coding/scripts/pre-tool-danger.sh"
+HOOK = "skills/anchor/scripts/pre-tool-danger.sh"
 
 TESTS = [
     # Codex r6 7

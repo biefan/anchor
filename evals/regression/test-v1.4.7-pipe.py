@@ -6,7 +6,7 @@ should not block. `curl x | bash` etc. (fetchers, decoders, dynamic content)
 still must block.
 """
 import json, subprocess, sys
-HOOK = "skills/efficient-coding/scripts/pre-tool-danger.sh"
+HOOK = "skills/anchor/scripts/pre-tool-danger.sh"
 
 TESTS = [
     # MUST BLOCK — fetcher/decoder/dynamic → shell

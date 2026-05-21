@@ -23,12 +23,12 @@
 ```
 
 用同样的 prompt 跑两次：
-- **with-skill**：你当前环境（~/.claude/skills/efficient-coding 已装）
+- **with-skill**：你当前环境（~/.claude/skills/anchor 已装）
 - **without-skill**：临时移走 skill 跑同样的 prompt
   ```bash
-  mv ~/.claude/skills/efficient-coding /tmp/ec-backup
+  mv ~/.claude/skills/anchor /tmp/ec-backup
   # 重启 Claude Code，跑同样的 prompt
-  # 跑完恢复：mv /tmp/ec-backup ~/.claude/skills/efficient-coding
+  # 跑完恢复：mv /tmp/ec-backup ~/.claude/skills/anchor
   ```
 
 记录差异。

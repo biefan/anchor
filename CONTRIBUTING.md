@@ -20,25 +20,25 @@ cd ~/anchor
 The `install.sh` is **idempotent** and re-running it is the standard "apply my edits" step:
 
 1. Edit a file under `/root/anchor/` (or wherever you cloned).
-2. Re-run `./install.sh`. It overwrites `~/.claude/skills/efficient-coding/`, `~/.claude/commands/`, and `~/.codex/skills/*` from the repo.
+2. Re-run `./install.sh`. It overwrites `~/.claude/skills/anchor/`, `~/.claude/commands/`, and `~/.codex/skills/*` from the repo.
 3. Re-invoke the affected skill (`/ec`) or trigger the affected hook in a fresh Claude Code session.
 
 For the hook scripts specifically you can also smoke-test them in isolation:
 
 ```bash
 echo '{"tool_name":"Bash","tool_input":{"command":"<your test cmd>"}}' \
-  | bash skills/efficient-coding/scripts/pre-tool-danger.sh
+  | bash skills/anchor/scripts/pre-tool-danger.sh
 ```
 
 ## Where each kind of change lands
 
 | Change | Edit here | Notes |
 |---|---|---|
-| Tweak a rule in the skill | `skills/efficient-coding/SKILL.md` | Cross-CLI: when you reference a Claude-Code-only tool name (`TaskCreate`, `AskUserQuestion`, `Agent`), include the Codex equivalent in parentheses. |
+| Tweak a rule in the skill | `skills/anchor/SKILL.md` | Cross-CLI: when you reference a Claude-Code-only tool name (`TaskCreate`, `AskUserQuestion`, `Agent`), include the Codex equivalent in parentheses. |
 | Add a slash command | `commands/<name>.md` | YAML frontmatter `description:` + body. `install.sh` will install it as both a Claude Code command and a Codex skill. |
-| Change a hook's logic | `skills/efficient-coding/scripts/<name>.sh` | Stdin = hook input JSON; stdout = `{"decision":"block","reason":...}` to block, or empty to allow. Keep `set -e`. Use a Python heredoc for anything non-trivial. **CI runs shellcheck on every `.sh`** — keep it clean. |
+| Change a hook's logic | `skills/anchor/scripts/<name>.sh` | Stdin = hook input JSON; stdout = `{"decision":"block","reason":...}` to block, or empty to allow. Keep `set -e`. Use a Python heredoc for anything non-trivial. **CI runs shellcheck on every `.sh`** — keep it clean. |
 | Tweak install behavior | `install.sh` / `uninstall.sh` | Must remain idempotent. CI runs `./install.sh --no-hooks` and `./uninstall.sh` on a clean container. |
-| Add a detailed reference (loaded on demand) | `skills/efficient-coding/references/<topic>.md` | Reference it from `SKILL.md`. |
+| Add a detailed reference (loaded on demand) | `skills/anchor/references/<topic>.md` | Reference it from `SKILL.md`. |
 | Add an eval scenario | `evals/evals.json` | Discriminators must be **behavioral** (`asks_at_least_one_clarifying_question`), not tool-specific (`uses_AskUserQuestion`). See `evals/results/20260521-071227-no-baseline/analysis.md` for why. |
 | Project meta (LICENSE / CHANGELOG / README) | repo root | Bump version in both `.claude-plugin/plugin.json` and `.codex-plugin/plugin.json` if you're releasing. |
 

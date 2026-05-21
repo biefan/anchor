@@ -3,9 +3,9 @@ description: 引导写一条踩坑记录到当前工作目录的 CLAUDE.md。Use
 argument-hint: "[bug 一句话标题，可选]"
 ---
 
-按 `efficient-coding` skill 的"犯错和修复后：把教训写回项目 CLAUDE.md"规则执行。
+按 `anchor` skill 的"犯错和修复后：把教训写回项目 CLAUDE.md"规则执行。
 
-完整模板参考：`~/.claude/skills/efficient-coding/references/pitfall-template.md`
+完整模板参考：`~/.claude/skills/anchor/references/pitfall-template.md`
 
 步骤：
 

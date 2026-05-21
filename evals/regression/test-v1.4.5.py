@@ -2,7 +2,7 @@
 """v1.4.5 regression — user-reported B1 (runuser/doas -c) + B2 install fix."""
 import json, subprocess, sys, os
 
-HOOK = "skills/efficient-coding/scripts/pre-tool-danger.sh"
+HOOK = "skills/anchor/scripts/pre-tool-danger.sh"
 
 TESTS = [
     # B1: runuser / doas / su variants with -c shell string

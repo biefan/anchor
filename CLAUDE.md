@@ -6,9 +6,9 @@
 
 A cross-CLI (Claude Code + Codex CLI) engineering-discipline pack:
 
-- **One skill** (`skills/efficient-coding/SKILL.md`) — 7 core rules + long-task mode + autonomous mode + E2E + multi-pass vuln scan + condition-based codex review + pitfall writeback.
+- **One skill** (`skills/anchor/SKILL.md`) — 7 core rules + long-task mode + autonomous mode + E2E + multi-pass vuln scan + condition-based codex review + pitfall writeback.
 - **7 slash commands** (`commands/*.md`): `/ec /lock /pit /scan /done /next /recap /init-claude-md`.
-- **4 safety hooks** (`hooks/hooks.json` + `skills/efficient-coding/scripts/*.sh`): `SessionStart`, `Stop`, `PreToolUse`, `PostToolUse`.
+- **4 safety hooks** (`hooks/hooks.json` + `skills/anchor/scripts/*.sh`): `SessionStart`, `Stop`, `PreToolUse`, `PostToolUse`.
 - **Bilingual docs** (`README.md` zh, `README.en.md` en).
 - **Evals** (`evals/`): 5 test prompts + runner + analysis.
 
@@ -27,7 +27,7 @@ Install via `./install.sh` (file-copy, auto-merges hooks into `~/.claude/setting
 ├── install.sh / uninstall.sh     # idempotent file-copy install
 ├── settings.hooks.json           # hook config merged into ~/.claude/settings.json
 ├── hooks/hooks.json              # same hooks for plugin install path
-├── skills/efficient-coding/
+├── skills/anchor/
 │   ├── SKILL.md
 │   ├── references/*.md           # detail loaded on demand
 │   └── scripts/*.sh              # hook implementations
@@ -41,21 +41,21 @@ Install via `./install.sh` (file-copy, auto-merges hooks into `~/.claude/setting
 
 | Change kind | Edit here |
 |---|---|
-| Tweak a rule in the skill itself | `skills/efficient-coding/SKILL.md` (then `./install.sh` to re-sync to `~/.claude/` and `~/.codex/`) |
+| Tweak a rule in the skill itself | `skills/anchor/SKILL.md` (then `./install.sh` to re-sync to `~/.claude/` and `~/.codex/`) |
 | Add a new slash command | `commands/<name>.md` (frontmatter `description:` + body) |
-| Change a hook's logic | `skills/efficient-coding/scripts/<name>.sh` (keep stdin / stdout contract — read JSON from stdin, write `{"decision":"block","reason":...}` JSON to stdout or exit 0) |
+| Change a hook's logic | `skills/anchor/scripts/<name>.sh` (keep stdin / stdout contract — read JSON from stdin, write `{"decision":"block","reason":...}` JSON to stdout or exit 0) |
 | Change install behavior | `install.sh` (idempotent, must not duplicate hooks on re-run) |
-| Add a detailed reference loaded on demand | `skills/efficient-coding/references/<topic>.md` (then reference it from `SKILL.md`) |
+| Add a detailed reference loaded on demand | `skills/anchor/references/<topic>.md` (then reference it from `SKILL.md`) |
 | Add an eval scenario | `evals/evals.json` (add to `evals` array with `discriminators` that are observable behaviors, not tool calls) |
 
 ### Editing the skill: hot reload
 
-Claude Code watches `~/.claude/skills/` for changes after session start. Editing `~/.claude/skills/efficient-coding/SKILL.md` reloads on next invocation **as long as the top-level `~/.claude/skills/` directory existed when the session started**. If you create that directory mid-session, restart Claude Code to begin watching it.
+Claude Code watches `~/.claude/skills/` for changes after session start. Editing `~/.claude/skills/anchor/SKILL.md` reloads on next invocation **as long as the top-level `~/.claude/skills/` directory existed when the session started**. If you create that directory mid-session, restart Claude Code to begin watching it.
 
 This means the dev workflow is:
 
-1. Edit `/root/skk/skills/efficient-coding/SKILL.md` (the repo source of truth).
-2. `cp` to `~/.claude/skills/efficient-coding/SKILL.md` (or re-run `./install.sh`).
+1. Edit `/root/skk/skills/anchor/SKILL.md` (the repo source of truth).
+2. `cp` to `~/.claude/skills/anchor/SKILL.md` (or re-run `./install.sh`).
 3. Re-trigger `/ec` in Claude Code to see the new content.
 
 ### Hooks: stdin/stdout contract
@@ -72,7 +72,7 @@ Test a hook locally before committing:
 
 ```bash
 echo '{"tool_name":"Bash","tool_input":{"command":"<test cmd>"}}' | \
-  bash skills/efficient-coding/scripts/pre-tool-danger.sh
+  bash skills/anchor/scripts/pre-tool-danger.sh
 ```
 
 ## Conventions
@@ -158,13 +158,13 @@ Results land in `evals/results/<timestamp>[-no-baseline]/`. See `evals/README.md
 ```bash
 # PreToolUse danger blocker
 echo '{"tool_name":"Bash","tool_input":{"command":"git reset --hard HEAD~1"}}' | \
-  bash skills/efficient-coding/scripts/pre-tool-danger.sh
+  bash skills/anchor/scripts/pre-tool-danger.sh
 # Should print {"decision":"block",...}, exit 0
 
 # Stop hook (must have autonomous flag + a real session task dir to trigger block)
 touch ~/.claude/.efficient-coding-autonomous
 echo '{"session_id":"<id-with-pending-tasks>"}' | \
-  bash skills/efficient-coding/scripts/stop-self-check.sh
+  bash skills/anchor/scripts/stop-self-check.sh
 rm ~/.claude/.efficient-coding-autonomous
 ```
 
