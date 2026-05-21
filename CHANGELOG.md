@@ -3,6 +3,37 @@
 All notable changes to **anchor** are tracked here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.1] — 2026-05-21
+
+User-reported combo bypasses (round 12). Found 4 bypass classes that combined multiple defenses we'd already added separately.
+
+### Fixed — 🔴 Critical (4 combo bypasses)
+
+- **Bug 1 — substitution-as-cmd in shell -c**: `bash -c '$(echo rm) -rf /etc'`. The `$(echo rm)` substitution result becomes the argv0 of the shell -c body; static analysis can't know what it expands to. v1.5.1 `check_shell_dash_c` now detects `$(...)` / `` `...` `` followed by a destructive flag + system path inside the -c value and treats it as obfuscation.
+- **Bug 2 — pipeline-to-shell INSIDE shell -c value**: `sh -c 'echo $(whoami)|bash'`. The pipeline shape only triggered the main-flow pipeline-to-shell check (v1.4.7); the per-stage scan inside `check_shell_dash_c` saw `echo` and `bash` separately and missed the combination. v1.4.8 had fixed the same pattern for `git -c credential.helper`; v1.5.1 ports the fix to `check_shell_dash_c` as well.
+- **Bug 3 — nested heredoc not extracted recursively**: `bash <<'EOF'\\nsh <<EOT\\nrm -rf /\\nEOT\\nEOF`. The outer single-quoted EOF suppresses variable expansion (a known shell feature) and was the only thing v1.4.x extracted. The inner `<<EOT` body never reached the scanner. Now `extract_heredocs` recurses into the extracted bodies (depth-limited 5).
+- **Bug 4 — env -S broke wrapper-chain unwrap**: `sudo env -S 'FOO=1' timeout 30 nice ionice nohup setsid rm -rf /etc`. v1.4.4 added a `break` in `strip_env_assignments_and_wrappers` so `env -S` would be left visible to `check_env_dash_s`. But that meant if env was followed by more wrappers (timeout/nice/nohup/setsid/etc.) the chain stopped — the real `rm` at the end was never reached. Now after env -S is handled (phase 1 sees env via main-loop wrapper-visible scan), the unwrap continues past env and skips its -S value to keep stripping subsequent wrappers.
+
+### Architectural
+
+- Main per-stage scan now runs phase 1 wrapper-visible checkers (`check_env_dash_s`, `check_watch`, `check_parallel`, `check_taskset_chrt`) **before** `strip_env_assignments_and_wrappers`, so they see env/watch/parallel/taskset/chrt as argv0 even when the new env-S unwrap-and-continue logic would otherwise strip them.
+
+### Added
+
+- **`evals/regression/test-v1.5.1-combo.py`** with 15 cases — the 4 user-reported bypasses + variants + 5 regression cases to confirm legit usage still passes.
+
+### Verified — 11 suites, 187/187 pass
+
+shellcheck PASS. jsonlint PASS.
+
+### Plugin manifest
+
+- Versions bumped 1.5.0 → 1.5.1.
+
+### Pending
+
+User also reported **30 fresh-eyes findings** (new attack surface coverage gaps) that I don't have specific commands for. Filing as TBD — needs the user's stress-fresh-eyes.py contents to address.
+
 ## [1.5.0] — 2026-05-21
 
 **Major rename**: skill identifier `ec` → `anchor` to match the project brand. `/ec` continues to work as a backward-compat alias.

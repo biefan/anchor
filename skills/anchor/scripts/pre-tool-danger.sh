@@ -216,13 +216,37 @@ def strip_env_assignments_and_wrappers(tokens):
         # Wrappers
         wname = basename(t)
         if wname in WRAPPERS:
-            # Special case: env -S "shell string" — `-S` makes env split a
-            # shell-string and execute. Don't unwrap env so check_env_dash_s sees it.
+            # env -S: check_env_dash_s (phase 1) handles the value scan.
+            # v1.5.1 Bug 4: skip env+flags+-S VALUE then CONTINUE unwrapping
+            # subsequent wrappers (was `break` which left chain wrappers in place).
             if wname == "env" and any(
                 (a == "-S" or a.startswith("-S"))
                 for a in tokens[i + 1:]
             ):
-                break
+                env_vflags = WRAPPER_VALUE_FLAGS.get("env", set())
+                i += 1  # past 'env'
+                while i < len(tokens):
+                    arg = tokens[i]
+                    if arg == "-S" and i + 1 < len(tokens):
+                        i += 2
+                        continue
+                    if arg.startswith("-S"):
+                        i += 1
+                        continue
+                    if arg in env_vflags:
+                        i += 2
+                        continue
+                    if arg.startswith("--") and "=" in arg:
+                        i += 1
+                        continue
+                    if arg.startswith("-") and arg != "-":
+                        i += 1
+                        continue
+                    if "=" in arg and re.match(r"^[A-Za-z_]", arg):
+                        i += 1
+                        continue
+                    break
+                continue  # outer while: unwrap the next wrapper
             # G2/v1.4.4 + B1/v1.4.5: shell-string-taking wrappers — don't
             # unwrap so check_shell_dash_c sees them. doas added in v1.4.5
             # for symmetry with runuser/su (was relying on check_rm post-unwrap;
@@ -329,20 +353,16 @@ def shlex_split_stages(cmd_str):
     return [s for s in stages if s], True
 
 
-def extract_heredocs(cmd_str):
-    """G1: Pull `<<EOF...EOF` / `<<-EOF...EOF` heredoc bodies out of the raw cmd
-    so they can be scanned as inner shell.
-
-    Returns list of body strings. The body of `bash <<EOF\\nrm -rf /\\nEOF`
-    is `rm -rf /`.
-    """
+def extract_heredocs(cmd_str, depth=0):
+    """G1: Pull heredoc bodies. v1.5.1 Bug 3: recurse into nested heredocs."""
+    if depth > 5:
+        return []
     out = []
-    # Match << or <<- followed by optional quotes + delimiter, then capture
-    # everything until a line equal to the delimiter (possibly indented for <<-).
     for m in re.finditer(r"<<-?\s*['\"]?(\w+)['\"]?\n(.*?)\n\s*\1\b", cmd_str, re.DOTALL):
         body = m.group(2).strip()
         if body:
             out.append(body)
+            out.extend(extract_heredocs(body, depth + 1))
     return out
 
 
@@ -890,6 +910,28 @@ def check_shell_dash_c(argv):
                     break
         if inner is None:
             continue
+        # v1.5.1 Bug 2: pipeline-to-shell INSIDE shell -c value
+        # (sh -c 'echo $(whoami)|bash' was passing because per-stage scan
+        # didn't see the pipeline shape).
+        inner_pipe = shlex_pipeline_stages(inner)
+        if inner_pipe and len(inner_pipe) >= 2:
+            stage_bases = []
+            for s_argv in inner_pipe:
+                u = strip_env_assignments_and_wrappers(s_argv)
+                stage_bases.append(basename(u[0]) if u else "")
+            if stage_bases[-1] in SHELL_BASENAMES | INTERPRETER_BASENAMES:
+                upstream_all_safe = all(b in SAFE_CMDS for b in stage_bases[:-1])
+                has_subst = bool(re.search(r"\$\(|<\(|`|\$\{|\$[A-Za-z_]", inner))
+                if not (upstream_all_safe and not has_subst):
+                    return (f"{cmd0} -c 含 pipeline → {stage_bases[-1]} "
+                            f"({ ' | '.join(stage_bases) }) — 远程/动态进 shell")
+        # v1.5.1 Bug 1: substitution-as-cmd-argv0 (e.g. `bash -c '$(echo rm) -rf /'`)
+        # — substitution result becomes the cmd, can't statically tell what it is.
+        # Combined with destructive flag + path target it's an obfuscation pattern.
+        if re.search(r"\$\([^)]*\)\s*-[a-zA-Z]+\s*(?:/|~|\$\{?HOME)", inner) or \
+           re.search(r"`[^`]*`\s*-[a-zA-Z]+\s*(?:/|~|\$\{?HOME)", inner):
+            return (f"{cmd0} -c 含 substitution-as-cmd 后跟 destructive flag + 系统路径"
+                    " — 动态命令调度 obfuscation")
         sub_stages, ok = shlex_split_stages(inner)
         if not ok:
             return f"{cmd0} -c 内的命令字符串无法 tokenize — obfuscation"
@@ -1450,7 +1492,16 @@ if not ok:
 
 checked = set()
 for stage_argv in stages or []:
-    # Strip env-prefix VAR=val and wrapper invocations.
+    # v1.5.1: phase 1 wrapper-visible checkers run BEFORE strip_env so they
+    # can see env/watch/parallel/taskset/chrt as argv0 (after Bug 4 fix moved
+    # strip_env to actually skip env -S aggressively).
+    for checker in (check_env_dash_s, check_watch, check_parallel, check_taskset_chrt):
+        msg = checker(stage_argv)
+        if msg:
+            emit_block(f"argv:{basename(stage_argv[0])}", msg,
+                       " ".join(stage_argv[:6]), cmd)
+
+    # Strip env-prefix VAR=val and wrapper invocations (phase 2 prep).
     real = strip_env_assignments_and_wrappers(stage_argv)
     if not real:
         continue
