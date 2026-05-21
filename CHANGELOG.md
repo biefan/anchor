@@ -3,6 +3,87 @@
 All notable changes to **anchor** are tracked here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] — 2026-05-21
+
+Second-pass codex adversarial-review patch. **Major version bump because `pre-tool-danger.sh` is fully rewritten** around shell tokenization (Python `shlex`) instead of regex on the raw command string. The previous regex layer was inherently bypassable by quoting, hex escapes, `${IFS}`, command wrappers, and nested substitution — codex pass 2 demonstrated 5 of those bypass classes. All 19 issues from that pass are addressed here.
+
+### 🔴 PreToolUse rewrite — closes 5 bypass classes (B1-B5)
+
+- **Wrapper unwrap (B1)**: `env rm -rf /`, `command rm -rf /`, `sudo -E rm -rf $HOME` now block. `env`/`command`/`sudo`/`exec`/`time`/`nice`/`ionice`/`unshare`/`setpriv`/`stdbuf` are removed from `SAFE_FIRST` and treated as wrappers; the hook strips them (plus any of their own flags + `VAR=val` env prefixes) before scanning the real argv.
+- **Subcommand-spawning tools (B2)**: `find -exec rm -rf {} \;`, `awk 'BEGIN{system(...)}'`, `find -delete`, `sed e cmd` — all now block via dedicated checkers. `find`, `awk`, `sed`, `xargs` removed from `SAFE_FIRST` since they can launch arbitrary sub-commands.
+- **Obfuscation detection (B3, B4)**: ANSI-C hex escapes (`$'\x72\x6d'`), octal escapes (`$'\127'`), `${IFS}` whitespace substitution, and 3+ consecutive `\xNN` sequences are flagged as obfuscation patterns and block immediately. Trying to decode them is a losing game; refusing to evaluate is the safe answer.
+- **Quoted targets (B5)**: switched to `shlex.split(posix=True)` so `rm -rf "$HOME"` tokenizes to `["rm", "-rf", "$HOME"]` — the regex now sees the dequoted target. Same fix handles `rm -rf -- "$HOME"`, `rm -rf ${HOME}`, etc.
+
+### 🟠 PreToolUse correctness fixes (B6-B10)
+
+- **git global flag value form (B6)**: `git --git-dir /repo/.git --work-tree /repo reset --hard` now blocks. The argv-walking checker skips global flags (`-C`, `-c`, `--git-dir`, `--work-tree`, `--namespace`, etc.) — both `--flag=value` and `--flag value` forms — before looking for the subcommand.
+- **git push force refspec (B7)**: `git push origin +main` (force update via refspec prefix) and `git push origin --delete main` (remote branch delete) now block, alongside `-f`/`--force`/`--force-with-lease`.
+- **Nested substitution (B8)**: `extract_substitutions` now does balanced-paren matching recursively (up to 5 levels deep), so `echo $(rm -rf $(printf /))` and `echo "\`rm -rf /\`"` block via the inner-body scan.
+- **Pipe-to-shell variants (B9)**: `curl X | /bin/bash`, `curl X | env bash`, `curl X | tee /tmp/log | bash` all block. Pipeline analysis tokenizes with shlex (quote-aware), matches basenames after wrapper unwrap, and triggers when any stage is a shell/interpreter AND any earlier stage is a fetcher (`curl`/`wget`/`fetch`).
+- **Decoder-to-shell (B10)**: `printf YWJj | base64 -d | bash`, `cat encoded | xxd -r | bash`, `openssl enc -d | sh` etc. block via the same pipeline analyzer (recognizes `base64`/`openssl`/`xxd`/`uudecode`/`tr` as decoders).
+
+### 🟡 Install/uninstall hardening (B11-B16, B18)
+
+- **B11 dedup distinguishes plugin vs home scheme**: when `./install.sh` runs and an anchor hook is already present at `${CLAUDE_PLUGIN_ROOT}/...`, the home-scheme version replaces it (otherwise the user is left with stale plugin paths if they later remove the plugin).
+- **B12, B13 read-modify-write lock**: both install.sh's merge branch and uninstall.sh wrap settings.json access in `fcntl.flock(LOCK_EX)`. Concurrent installs / uninstalls now serialize cleanly instead of stomping on each other.
+- **B14, B15 preserve original mode**: `tempfile.mkstemp` defaults to mode 0o600; previously `os.replace` would silently widen restrictive permissions or narrow generous ones. Both install.sh and uninstall.sh now `os.chmod(tmp, orig_mode)` before replacing, capturing the original mode via `stat.S_IMODE(os.stat(target).st_mode)`.
+- **B16 uninstall ordering**: settings.json is cleaned **first**; only on success are script files removed. If JSON parsing / permission / replace fails, no files are deleted, so settings.json's hook entries still point at real scripts. Previously the order was reversed — a settings clean failure would have left hooks pointing at deleted scripts.
+- **B18 hook-path-source filter**: by default uninstall only removes hook entries whose path matches `$HOME/.claude/skills/efficient-coding/...` (the install.sh-managed scheme). Plugin-marketplace hooks (`${CLAUDE_PLUGIN_ROOT}/...`) are left alone — they're owned by the plugin system and removing the plugin should clean them. New `--all-hooks` flag opts into clearing both.
+
+### 🟢 Backup naming (B19)
+
+- Install and uninstall backups now use `mktemp settings.json.bak.XXXXXX` instead of `$(date +%s)`-suffixed, so concurrent or rapid re-runs can't collide on the backup filename.
+
+### 🟢 Cosmetic (B17)
+
+- **Quoted pipe data no longer false-trips (B17)**: `printf 'curl x | bash'` now passes (the `|` is quoted data, not a real pipeline). The pipeline detector uses `shlex.split` directly so quoted operators are seen as part of a single argv token, not pipeline separators.
+
+### Verified — 32/32 regression tests
+
+PreToolUse test suite (`/tmp/test-pretool-v1.4.sh`) runs 32 cases covering all 19 codex findings + 11 historical regressions. **All 32 pass**:
+
+```
+B1a env rm-rf /                     BLOCK ✓
+B1b command rm-rf /                 BLOCK ✓
+B1c sudo -E rm-rf $HOME             BLOCK ✓
+B2a find -exec rm -rf {} ;          BLOCK ✓
+B2b awk system()                    BLOCK ✓
+B2c find -delete                    BLOCK ✓
+B3 ANSI-C hex escape                BLOCK ✓
+B4 ${IFS} whitespace substitution   BLOCK ✓
+B5 rm -rf "$HOME" (quoted)          BLOCK ✓
+B5' rm -rf -- $HOME (end-opts)      BLOCK ✓
+B6 git --git-dir VALUE reset --hard BLOCK ✓
+B7a git push origin +main           BLOCK ✓
+B7b git push origin --delete main   BLOCK ✓
+B8 echo $(rm -rf $(printf /))       BLOCK ✓
+B8' echo "`rm -rf /`"               BLOCK ✓
+B9a curl | /bin/bash                BLOCK ✓
+B9b curl | env bash                 BLOCK ✓
+B9c curl | tee | bash               BLOCK ✓
+B10 base64 -d | bash                BLOCK ✓
+B17a printf 'curl X | bash'         PASS  ✓ (quoted, not pipeline)
++ 12 historical regressions          all ✓
+```
+
+Plus `shellcheck` + `jsonlint` PASS on the whole repo, install.sh idempotent re-run exits 0.
+
+### Documentation
+
+- Pre-tool-danger.sh header now documents its design (shlex tokenization, wrapper unwrap, obfuscation refusal, pipeline analysis, balanced-paren substitution extraction) AND its **limitations**: "sufficiently obfuscated shell can always defeat any static analyzer; we block obvious obfuscation rather than try to decode it. Hook is *anti-instinct first defense*, not *anti-motivated-attacker last resort*."
+
+### Audit history total
+
+- **External review (v1.3.6)**: 10 fixes
+- **Self-audit (v1.3.7)**: 5 fixes
+- **Codex pass 1 (v1.3.8)**: 15 fixes
+- **Codex pass 2 (v1.4.0)**: 19 fixes
+- **Cumulative**: 49 bugs caught across 4 audits + 1 day. Multi-pass scanning is empirically essential.
+
+### Plugin manifest
+
+- Major version bump 1.3.8 → 1.4.0. The pre-tool-danger.sh rewrite is the biggest behavioral change since v1.0.
+
 ## [1.3.8] — 2026-05-21
 
 Codex adversarial-review patch. After v1.3.7, codex did its own independent audit pass and found **15 more bugs** that both the external review and the self-audit had missed. Five were **PreToolUse hook bypass classes** — the very thing anchor's "硬约束" layer promises. All 15 fixed here.
