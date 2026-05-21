@@ -764,6 +764,205 @@ def check_disk_ops(argv):
     return None
 
 
+# v1.5.2: Destructive admin commands dispatch table.
+# Each cmd → list of (regex, msg). Regex runs against " ".join(argv[1:]).
+# Covers ~30 attack surfaces beyond rm/git/disk: firewall ops, service control,
+# cron deletion, privilege backdoors, log shredding, cloud nuke, container prune,
+# system shutdown, immutable-bit toggling, mass kill, package uninstall, symlink
+# overwrite of system paths.
+ADMIN_DESTRUCTIVE_PATTERNS = {
+    "truncate": [
+        (r"(?:^|\s)-s\s*0(?:\s|$)|--size[=\s]+0(?:\s|$)", "truncate -s 0 清空文件内容"),
+    ],
+    "iptables": [
+        (r"(?:^|\s)-F(?:\s|$)|--flush", "iptables -F 清空防火墙规则"),
+        (r"(?:^|\s)-X(?:\s|$)|--delete-chain", "iptables -X 删除用户链"),
+        (r"(?:^|\s)-P\s+\w+\s+ACCEPT", "iptables -P ACCEPT 设默认放行策略"),
+    ],
+    "ip6tables": [
+        (r"(?:^|\s)-F(?:\s|$)|--flush", "ip6tables -F 清空 IPv6 防火墙"),
+    ],
+    "nft": [
+        (r"\bflush\s+ruleset\b", "nft flush ruleset 清空所有 nftables 规则"),
+    ],
+    "ufw": [
+        (r"\b(disable|reset)\b", "ufw disable/reset 关闭/清空 Ubuntu 防火墙"),
+    ],
+    "firewall-cmd": [
+        (r"--complete-reload|--panic-off", "firewall-cmd 重置/取消 panic"),
+    ],
+    "systemctl": [
+        (r"\b(stop|disable|mask|kill)\s+(firewalld|ssh|sshd|ufw|nftables|iptables|"
+         r"auditd|fail2ban|apparmor|selinux|systemd-resolved|systemd-networkd|"
+         r"NetworkManager|cron|crond)\b",
+         "systemctl 对安全关键服务 stop/disable/mask/kill"),
+        (r"\b(isolate)\s+(rescue|emergency|poweroff|halt|reboot)", "systemctl isolate 切换危险目标"),
+    ],
+    "crontab": [
+        (r"(?:^|\s)-r(?:\s|$)", "crontab -r 删除所有定时任务"),
+    ],
+    "useradd": [
+        (r"(?:^|\s)-u\s*0(?:\s|$)|--uid[=\s]+0", "useradd UID 0 创建 root 后门账户"),
+        (r"(?:^|\s)-o(?:\s|$)|--non-unique", "useradd -o 允许重复 UID 通常用于后门"),
+    ],
+    "usermod": [
+        (r"(?:^|\s)-u\s*0(?:\s|$)|--uid[=\s]+0", "usermod 改 UID 为 0"),
+        (r"-aG\s+(sudo|wheel|admin|adm|root)\b", "usermod -aG sudo/wheel 提权"),
+    ],
+    "passwd": [
+        (r"(?:^|\s)--stdin\b", "passwd --stdin 非交互改密"),
+        (r"(?:^|\s)-d\b|--delete", "passwd -d 删除密码（允许空密码登录）"),
+    ],
+    "chpasswd": [
+        (r".*", "chpasswd 批量改密码"),
+    ],
+    "journalctl": [
+        (r"--vacuum-time[=\s]", "journalctl --vacuum-time 清理审计日志"),
+        (r"--vacuum-size[=\s]+(0|1)\b", "journalctl --vacuum-size 接近 0 = 清日志"),
+        (r"--vacuum-files[=\s]+(0|1)\b", "journalctl --vacuum-files 接近 0 = 清日志"),
+        (r"--rotate\b", "journalctl --rotate (隐含 vacuum 风险)"),
+    ],
+    "chattr": [
+        (r"(?:^|\s)[+\-=]i(?:\s|$)", "chattr ±i 改文件不可修改属性（系统文件锁/解锁）"),
+        (r"(?:^|\s)[+\-=]a(?:\s|$)", "chattr ±a 改 append-only 属性"),
+    ],
+    "setcap": [
+        (r"\bcap_(setuid|setgid|sys_admin|sys_ptrace|dac_override|dac_read_search|net_admin|net_raw)[=,+]",
+         "setcap 赋予特权能力（提权风险）"),
+    ],
+    "shutdown": [(r".*", "shutdown 关机/重启系统")],
+    "poweroff": [(r".*", "poweroff 关机")],
+    "reboot": [(r".*", "reboot 重启")],
+    "halt": [(r".*", "halt 停机")],
+    "init": [(r"(?:^|\s)[06](?:\s|$)", "init 0/6 关机/重启")],
+    "swapoff": [
+        (r"(?:^|\s)-a\b|--all", "swapoff -a 关闭所有 swap"),
+    ],
+    "mount": [
+        (r"-o\s+[^\s]*remount[^\s]*,ro\b|\bremount,ro\b",
+         "mount remount,ro 将根挂载只读（系统锁死风险）"),
+    ],
+    "umount": [
+        (r"(?:^|\s)-a\b|--all", "umount -a 卸载全部"),
+        (r"(?:^|\s)/(?:etc|var|usr|home|root|boot)(?:\s|$)", "umount 系统关键挂载点"),
+    ],
+    "loginctl": [
+        (r"\bterminate-(user|session)\b|\bkill-(user|session)\b", "loginctl terminate/kill user/session"),
+    ],
+    "pkill": [
+        (r"(?:^|\s)-9?\s+(systemd|init)\b", "pkill systemd/init = 杀 PID 1"),
+        (r"--signal\s+(?:9|KILL)\s+(systemd|init)\b", "pkill --signal KILL systemd"),
+    ],
+    "killall": [
+        (r"(?:^|\s)-9?\s+(systemd|init)\b", "killall systemd/init"),
+        (r"(?:^|\s)-9?\s+\*", "killall *"),
+    ],
+    "kill": [
+        (r"(?:^|\s)-(?:9|KILL|SIGKILL)\s+-1(?:\s|$)", "kill -9 -1 杀光所有进程"),
+        (r"(?:^|\s)-(?:9|KILL|SIGKILL)\s+1(?:\s|$)", "kill -9 1 杀 PID 1"),
+    ],
+    "gpg": [
+        (r"--delete-secret-keys?\b|--delete-secret-and-public-keys?",
+         "gpg --delete-secret-keys 删除私钥"),
+    ],
+    "pip": [
+        (r"\buninstall\b[^|;&]*?-y\b|\buninstall\b[^|;&]*?--yes\b",
+         "pip uninstall -y 无确认卸载"),
+    ],
+    "pip3": [
+        (r"\buninstall\b[^|;&]*?-y\b|\buninstall\b[^|;&]*?--yes\b",
+         "pip3 uninstall -y 无确认卸载"),
+    ],
+    "npm": [
+        (r"\b(uninstall|rm|remove)\b[^|;&]*?(?:^|\s)(-g|--global)(?:\s|$)",
+         "npm uninstall -g 全局移除"),
+    ],
+    "apt": [
+        (r"\b(remove|purge|autoremove)\b[^|;&]*?(?:-y\b|--yes\b)",
+         "apt remove/purge -y 无确认卸载"),
+    ],
+    "apt-get": [
+        (r"\b(remove|purge|autoremove)\b[^|;&]*?(?:-y\b|--yes\b)",
+         "apt-get remove/purge -y"),
+    ],
+    "dpkg": [
+        (r"(?:^|\s)--purge\b|(?:^|\s)-P\b", "dpkg --purge 移除包+配置"),
+        (r"(?:^|\s)--force-remove-essential", "dpkg --force-remove-essential"),
+    ],
+    "aws": [
+        (r"\biam\s+delete-(user|role|policy|group|access-key)\b",
+         "aws iam delete-* 账号级破坏"),
+        (r"\bs3\s+rm\b[^|;&]*?--recursive",
+         "aws s3 rm --recursive 批量删除"),
+        (r"\bs3api\s+delete-bucket\b", "aws s3api delete-bucket"),
+        (r"\brds\s+delete-db-(instance|cluster|snapshot)\b", "aws rds delete DB"),
+        (r"\bec2\s+terminate-instances\b", "aws ec2 terminate-instances"),
+    ],
+    "gcloud": [
+        (r"\bprojects\s+delete\b", "gcloud projects delete"),
+        (r"\bcompute\s+instances\s+delete\b", "gcloud compute instances delete"),
+        (r"\bsql\s+instances\s+delete\b", "gcloud sql instances delete"),
+    ],
+    "az": [
+        (r"\bgroup\s+delete\b", "az group delete"),
+        (r"\baccount\s+clear\b", "az account clear"),
+        (r"\bvm\s+delete\b", "az vm delete"),
+    ],
+    "terraform": [
+        (r"\bdestroy\b[^|;&]*?(?:-auto-approve|--auto-approve)",
+         "terraform destroy -auto-approve"),
+    ],
+    "kubectl": [
+        (r"\bdelete\s+(?:ns|namespace|pv|persistentvolume|node)\b[^|;&]*?--force",
+         "kubectl delete critical resource --force"),
+        (r"\bdelete\s+all\s+--all\b", "kubectl delete all --all"),
+        (r"\bdelete\s+\S+\s+--all\b[^|;&]*?--all-namespaces",
+         "kubectl delete --all --all-namespaces"),
+    ],
+    "docker": [
+        (r"\bsystem\s+prune\b[^|;&]*?(?:-a|--all)\b[^|;&]*?--volumes",
+         "docker system prune -a --volumes"),
+        (r"\bvolume\s+prune\b[^|;&]*?(?:-f\b|--force)\b",
+         "docker volume prune -f"),
+    ],
+    "podman": [
+        (r"\bsystem\s+prune\b[^|;&]*?(?:-a|--all)\b[^|;&]*?--volumes",
+         "podman system prune -a --volumes"),
+    ],
+    "ln": [
+        (r"(?:^|\s)-s[fF]?\b[^|;&]*?\s/(?:etc|var|usr|bin|sbin|lib|lib64|root|boot|home)(?:/|\s|$)",
+         "ln -sf 指向系统关键路径（symlink 覆盖）"),
+    ],
+    "mkfs": [
+        (r".*", "mkfs 格式化文件系统"),  # any mkfs.* invocation handled in check_disk_ops too
+    ],
+    "fdisk": [
+        (r".*", "fdisk 分区操作"),
+    ],
+    "wipefs": [
+        (r".*", "wipefs 擦除签名"),
+    ],
+    "blkdiscard": [
+        (r".*", "blkdiscard 块设备 discard"),
+    ],
+}
+
+
+def check_destructive_admin(argv):
+    """v1.5.2: catch destructive admin commands beyond rm/git via dispatch table."""
+    if not argv:
+        return None
+    cmd0 = basename(argv[0])
+    patterns = ADMIN_DESTRUCTIVE_PATTERNS.get(cmd0)
+    if not patterns:
+        return None
+    joined = " " + " ".join(argv[1:]) + " "
+    for regex, msg in patterns:
+        if re.search(regex, joined, re.IGNORECASE):
+            return f"{cmd0}: {msg}"
+    return None
+
+
 def check_redirect_to_device(stage_str):
     # E11+G6: cover write redirection (>, >>, >|), tee/cp/install destinations,
     # modern device naming, AND Linux stable device aliases
@@ -1285,7 +1484,8 @@ def scan_argv(argv, sub_check=False):
                     check_git_destructive, check_git_config_injection,
                     check_cp_mv_to_system,
                     check_sql_destroy, check_disk_ops,
-                    check_find_exec, check_awk_system, check_sed_e, check_xargs):
+                    check_find_exec, check_awk_system, check_sed_e, check_xargs,
+                    check_destructive_admin):
         msg = checker(argv)
         if msg:
             return msg

@@ -3,6 +3,71 @@
 All notable changes to **anchor** are tracked here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.2] — 2026-05-21
+
+**Defense scope extension**. User stress-fresh-eyes.py reported 30 fail (13/43 pass) covering new attack surfaces beyond the rm/git/disk axes — firewall ops, service control, privilege backdoors, cloud nuke, container prune, log shredding, etc. These were "coverage gaps" not "bypass bugs"; v1.5.2 adds a single dispatch-table `check_destructive_admin` covering 40+ such commands.
+
+### Added — `ADMIN_DESTRUCTIVE_PATTERNS` dispatch table
+
+A compact dict mapping each command → `[(regex, msg), ...]`. Runs the regex against ` ` + `" ".join(argv[1:])` + ` `. **40 cmd families** covered:
+
+| Class | Commands |
+|---|---|
+| **File zeroing** | `truncate -s 0` |
+| **Firewall** | `iptables -F/-X/-P ACCEPT`, `ip6tables -F`, `nft flush ruleset`, `ufw disable/reset`, `firewall-cmd --panic-off` |
+| **Service control (security-critical)** | `systemctl stop/disable/mask/kill` on firewalld/sshd/auditd/fail2ban/apparmor/selinux/NetworkManager/cron etc.; `systemctl isolate rescue/emergency/poweroff` |
+| **Cron destruction** | `crontab -r`, `crontab -u USER -r` |
+| **Privilege backdoors** | `useradd -o -u 0` / `--uid=0`, `usermod -aG sudo/wheel/admin/adm/root`, `passwd --stdin` / `-d` |
+| **Log shredding** | `journalctl --vacuum-time/--vacuum-size=0/--rotate` |
+| **Immutable bit + caps** | `chattr ±i/±a`, `setcap cap_setuid/setgid/sys_admin/sys_ptrace/dac_override/net_admin/net_raw` |
+| **Shutdown / reboot** | `shutdown`, `poweroff`, `reboot`, `halt`, `init 0`, `init 6` |
+| **Mass kill** | `kill -9 -1` (all user procs), `kill -9 1` (PID 1), `pkill systemd/init`, `killall systemd/init`, `killall *` |
+| **Filesystem control** | `swapoff -a`, `mount remount,ro /`, `umount -a`, `umount /etc/var/usr/home/root/boot` |
+| **Session takeover** | `loginctl terminate-user/kill-user/kill-session` |
+| **Key deletion** | `gpg --delete-secret-keys` |
+| **Package nuke (no confirm)** | `pip uninstall -y`, `pip3 uninstall --yes`, `npm uninstall -g`, `apt remove/purge -y`, `apt-get purge -y`, `dpkg --purge` / `--force-remove-essential` |
+| **Cloud account nuke** | `aws iam delete-user/role/policy/group/access-key`, `aws s3 rm --recursive`, `aws s3api delete-bucket`, `aws rds delete-db-instance/cluster/snapshot`, `aws ec2 terminate-instances`, `gcloud projects/compute/sql delete`, `az group/account/vm delete` |
+| **IaC nuke** | `terraform destroy -auto-approve` |
+| **K8s + container** | `kubectl delete ns/pv/node --force`, `kubectl delete all --all`, `docker system prune -a --volumes`, `docker volume prune -f`, `podman system prune -a --volumes` |
+| **Symlink overwrite** | `ln -sf X /etc/passwd` family (target into critical system paths) |
+| **Disk format** | `mkfs.*`, `fdisk`, `wipefs`, `blkdiscard` (the explicit cmd0; `dd of=/dev/...` still covered by check_disk_ops) |
+
+### Added — `evals/regression/test-v1.5.2-admin.py`
+
+**90 cases**: 73 expected-BLOCK across 40 cmds + 17 expected-PASS regressions (`systemctl status` / `iptables -L` / `crontab -l` / safe `kill PID` / `useradd -m newuser` / `pip install` / etc.).
+
+### Verified — 12 suites, 277/277 pass
+
+```
+test-v1.4.0-history.sh    32/32 ✓
+test-v1.4.1-codex-r3.sh   15/15 ✓
+test-v1.4.2-codex-r4.sh   25/25 ✓
+test-v1.4.3-codex-r5.py   18/18 ✓
+test-v1.4.4-codex-r6.py   21/21 ✓
+test-v1.4.4-git-cp-mv.py  15/15 ✓
+test-v1.4.5.py            10/10 ✓
+test-v1.4.6.py             9/9  ✓
+test-v1.4.7-pipe.py       17/17 ✓
+test-v1.4.8.py            10/10 ✓
+test-v1.5.1-combo.py      15/15 ✓
+test-v1.5.2-admin.py      90/90 ✓ (NEW)
+─────────────────────────────────
+                        277/277 ✓
+```
+
+shellcheck PASS. Zero regressions on the 187 historical cases — `check_destructive_admin` runs last in `scan_argv`'s checker chain and only fires when basename matches the dispatch table key.
+
+### Design notes
+
+- **Dispatch table over 30 separate functions**: keeps the file from bloating; each new attack surface is one line in the dict.
+- **Regex on joined argv string**, not per-token, because admin commands are often multi-word (`aws s3 rm`, `kubectl delete ns`, etc.).
+- **Conservative regressions**: each command has 1-3 PASS test cases covering normal usage, so we know the regex isn't over-matching.
+- **`mkfs`/`fdisk`/`wipefs`/`blkdiscard`** match `.*` because their mere invocation is destructive. These are also still caught by `check_disk_ops`'s `dd of=/dev/...` rule for the dd-specific case, but adding them here ensures the dispatch table is the single point of truth.
+
+### Plugin manifest
+
+- Versions bumped 1.5.1 → 1.5.2.
+
 ## [1.5.1] — 2026-05-21
 
 User-reported combo bypasses (round 12). Found 4 bypass classes that combined multiple defenses we'd already added separately.

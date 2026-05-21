@@ -15,6 +15,7 @@ Per-audit-round regression suites for `skills/anchor/scripts/pre-tool-danger.sh`
 | `test-v1.4.7-pipe.py` | user UX feedback | 17 | pipeline-to-shell false-positive reduction |
 | `test-v1.4.8.py` | user-reported round 11 | 10 | git -c credential.helper pipeline bypass |
 | `test-v1.5.1-combo.py` | user-reported round 12 | 15 | 4 combo bypasses (subst-as-cmd / pipe-in-shell-c / nested heredoc / env -S chain) |
+| `test-v1.5.2-admin.py` | defense-scope extension | 90 | 40+ admin/cloud/container destructive cmds + regressions |
 
 **Total**: 172 regression cases across 10 files, 11 audit rounds.
 
