@@ -3,6 +3,60 @@
 All notable changes to **anchor** are tracked here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.0] — 2026-05-21
+
+**Documentation split release**. User: "我们的那个 md 是不是太长了 能不能分散一点 md 出来啊 一个 md 干一个就行了啊". Single-responsibility splits applied to the two longest docs.
+
+### Changed — SKILL.md 410 → 145 lines (-65%)
+
+Moved deep details to 5 new references; kept core 8 rules + 反模式 + 完成清单 + 命令速查在 SKILL.md。
+
+**Token savings**: ~2650 tokens per session (every session that loads anchor skill — = ~$0.04 Opus / session at v4.7 pricing).
+
+5 new references:
+- **`intent-and-recon.md`** — 规则 #1 详解（意图清晰 + 60 秒定位 + 反模式）
+- **`coding-discipline.md`** — 规则 #4 详解（最小改动 / 显式 > 紧凑 / 信任契约 / 并行调用）
+- **`e2e-validation.md`** — E2E 标准 + 二阶问题自检 + 完成清单
+- **`codex-review-when.md`** — 规则 #6 详解（何时调 codex review）
+- **`debugging-and-risks.md`** — 卡住时 观察→假设→验证 + 高代价动作清单
+
+What stayed in SKILL.md:
+- 核心八条（带 references 指针）
+- 长任务模式简介（指向 autonomous-mode.md）
+- 自治模式简介
+- 反模式 list（保留 full list — quick reference 价值高）
+- 写完代码的最后一件事
+- 命令 + references 速查表
+
+### Changed — README.md 448 → 182 lines (-59%)
+
+Split into 4 new `docs/`:
+- **`docs/install.md`** — 安装/卸载（含 plugin 方式）+ 文件结构
+- **`docs/commands.md`** — 22 commands 详细分类 + use case + 命名冲突说明
+- **`docs/design.md`** — 设计原则（核心八条 + 防偏题 + 防记忆衰减 + 跨项目记忆系统）
+- **`docs/codex.md`** — Codex CLI 详细兼容矩阵 + 工具差异 + plugin 安装
+
+README.md 保留：
+- Hero + badges + 数字表
+- Quick links 到 5 个 docs
+- 实测战报（短）
+- 它解决什么（短）
+- 1 分钟上手（保留 8-line bash）
+- 22 commands 概览（6 类别 summary table）
+- 设计要点（短 + 链 docs/design.md）
+- Codex / 对比 / 致谢 / License 简短
+
+### Verified
+
+- **15 regression suites / 364/364 pass** — zero regression
+- shellcheck PASS on all 13 shell scripts
+- jsonlint PASS on all manifests
+- All internal links resolve (verified via Python AST walk on README + 4 new docs)
+
+### Plugin manifest
+
+- Minor 1.11.0 → 1.12.0.
+
 ## [1.11.0] — 2026-05-21
 
 **Triple feature release**: 自动 save (dream mode) + runtime detection + 命令冲突避免。
