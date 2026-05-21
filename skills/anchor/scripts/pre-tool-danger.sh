@@ -804,10 +804,19 @@ ADMIN_DESTRUCTIVE_PATTERNS = {
     "useradd": [
         (r"(?:^|\s)-u\s*0(?:\s|$)|--uid[=\s]+0", "useradd UID 0 创建 root 后门账户"),
         (r"(?:^|\s)-o(?:\s|$)|--non-unique", "useradd -o 允许重复 UID 通常用于后门"),
+        # v1.5.3 Bug 3: -G initial groups including privileged groups
+        (r"(?:^|\s)-G\s+\S*\b(sudo|wheel|admin|adm|root|docker|lxd)\b",
+         "useradd -G sudo/wheel/... 直接加入特权组（提权后门）"),
+        (r"--groups[=\s]+\S*\b(sudo|wheel|admin|adm|root|docker|lxd)\b",
+         "useradd --groups=sudo/wheel/..."),
     ],
     "usermod": [
         (r"(?:^|\s)-u\s*0(?:\s|$)|--uid[=\s]+0", "usermod 改 UID 为 0"),
-        (r"-aG\s+(sudo|wheel|admin|adm|root)\b", "usermod -aG sudo/wheel 提权"),
+        # v1.5.3: also catch -G without -a (set groups, equally privileging)
+        (r"(?:^|\s)-a?G\s+\S*\b(sudo|wheel|admin|adm|root|docker|lxd)\b",
+         "usermod -G/-aG sudo/wheel/... 提权"),
+        (r"--groups[=\s]+\S*\b(sudo|wheel|admin|adm|root|docker|lxd)\b",
+         "usermod --groups=sudo/wheel/..."),
     ],
     "passwd": [
         (r"(?:^|\s)--stdin\b", "passwd --stdin 非交互改密"),
@@ -930,8 +939,14 @@ ADMIN_DESTRUCTIVE_PATTERNS = {
          "podman system prune -a --volumes"),
     ],
     "ln": [
-        (r"(?:^|\s)-s[fF]?\b[^|;&]*?\s/(?:etc|var|usr|bin|sbin|lib|lib64|root|boot|home)(?:/|\s|$)",
-         "ln -sf 指向系统关键路径（symlink 覆盖）"),
+        # v1.5.3 Bug 1+2: ln's danger is the TARGET (last positional), not the source.
+        # `ln -sf /tmp/evil /etc/passwd` is dangerous (target=/etc/passwd).
+        # `ln -s /usr/lib/X /tmp/Y` is safe (target=/tmp/Y, source happens to be /usr/lib).
+        # The dispatch table can't easily find argv positions, so we use a stricter
+        # regex: " <system-path> $" (or before \s end) — last positional only.
+        # Also adds /dev/ (Bug 1).
+        (r"(?:^|\s)-s[fF]?\b[^|;&]*?\s(/(?:etc|var|usr|bin|sbin|lib|lib64|root|boot|home|dev|proc|sys)(?:/[^\s|;&]*)?)\s*$",
+         "ln -sf target 是系统关键路径（symlink 覆盖系统文件）"),
     ],
     "mkfs": [
         (r".*", "mkfs 格式化文件系统"),  # any mkfs.* invocation handled in check_disk_ops too

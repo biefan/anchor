@@ -3,6 +3,40 @@
 All notable changes to **anchor** are tracked here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.3] — 2026-05-21
+
+User-reported 3 bugs in v1.5.2 (round 14). All fixed.
+
+### Fixed — 🟠 High
+
+- **Bug 1: `ln -sf X /dev/sda` allowed**. v1.5.2's `ln` regex covered `/etc/var/usr/...` but missed `/dev/` / `/proc/` / `/sys/`. Added them.
+- **Bug 2: `ln -s /usr/lib/X /tmp/Y` falsely blocked**. v1.5.2 matched any system path appearing in the cmdline — including when it was the SOURCE (which is safe; ln's danger is the TARGET it creates). Regex tightened to anchor at end-of-segment so only the LAST positional (target) matches. Side effect: `ln -s /usr/lib/lib.so /tmp/lib.so` now correctly passes.
+- **Bug 3: `useradd -G sudo attacker` allowed**. v1.5.2 covered `-u 0` and `-o` but missed `-G` (initial supplementary groups). Same backdoor pattern as `usermod -aG sudo`. Added `useradd -G` and `--groups=` rules, plus extended `usermod` to catch `-G` without `-a` (set vs append, equally privileging). Also added `docker`/`lxd` groups (privileged via container runtime access).
+
+### Verified — 13 suites, 299/299 pass
+
+```
+test-v1.4.0-history.sh    32/32 ✓
+test-v1.4.1-codex-r3.sh   15/15 ✓
+test-v1.4.2-codex-r4.sh   25/25 ✓
+test-v1.4.3-codex-r5.py   18/18 ✓
+test-v1.4.4-codex-r6.py   21/21 ✓
+test-v1.4.4-git-cp-mv.py  15/15 ✓
+test-v1.4.5.py            10/10 ✓
+test-v1.4.6.py             9/9  ✓
+test-v1.4.7-pipe.py       17/17 ✓
+test-v1.4.8.py            10/10 ✓
+test-v1.5.1-combo.py      15/15 ✓
+test-v1.5.2-admin.py      90/90 ✓
+test-v1.5.3-fixes.py      22/22 ✓ (NEW)
+─────────────────────────────────
+                        299/299 ✓
+```
+
+### Plugin manifest
+
+- Versions bumped 1.5.2 → 1.5.3.
+
 ## [1.5.2] — 2026-05-21
 
 **Defense scope extension**. User stress-fresh-eyes.py reported 30 fail (13/43 pass) covering new attack surfaces beyond the rm/git/disk axes — firewall ops, service control, privilege backdoors, cloud nuke, container prune, log shredding, etc. These were "coverage gaps" not "bypass bugs"; v1.5.2 adds a single dispatch-table `check_destructive_admin` covering 40+ such commands.
