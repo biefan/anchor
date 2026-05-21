@@ -7,7 +7,15 @@ Bug 3: nested heredoc not extracted recursively
 Bug 4: env -S broke wrapper-chain unwrap, missing destructive cmd at end of chain
 """
 import json, subprocess, sys
-HOOK = "skills/anchor/scripts/pre-tool-danger.sh"
+import os
+
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+_CANDIDATES = [
+    os.path.expanduser("~/.claude/skills/anchor/scripts/pre-tool-danger.sh"),
+    os.path.join(SCRIPT_DIR, "..", "..", "skills", "anchor", "scripts", "pre-tool-danger.sh"),
+    "skills/anchor/scripts/pre-tool-danger.sh",
+]
+HOOK = next((p for p in _CANDIDATES if os.path.exists(p)), _CANDIDATES[-1])
 
 TESTS = [
     # Bug 1: substitution as cmd in shell -c

@@ -1,5 +1,12 @@
 #!/bin/bash
-HOOK=skills/anchor/scripts/pre-tool-danger.sh
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+for _candidate in \
+    "$HOME/.claude/skills/anchor/scripts/pre-tool-danger.sh" \
+    "$SCRIPT_DIR/../../skills/anchor/scripts/pre-tool-danger.sh" \
+    "skills/anchor/scripts/pre-tool-danger.sh"; do
+    if [ -f "$_candidate" ]; then HOOK="$_candidate"; break; fi
+done
+HOOK="${HOOK:-skills/anchor/scripts/pre-tool-danger.sh}"
 
 # Tests use :: delimiter so | inside cmds is safe.
 TESTS=(

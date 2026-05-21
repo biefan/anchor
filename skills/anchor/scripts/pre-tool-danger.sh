@@ -850,6 +850,9 @@ ADMIN_DESTRUCTIVE_PATTERNS = {
     "mount": [
         (r"-o\s+[^\s]*remount[^\s]*,ro\b|\bremount,ro\b",
          "mount remount,ro 将根挂载只读（系统锁死风险）"),
+        # v1.10.0 review gap: --bind/--rbind 改变文件系统视图
+        (r"(?:^|\s)(?:--bind|--rbind|-B|--move)(?:\s|$)",
+         "mount --bind/--rbind/--move 改变文件系统命名空间视图 — 隐蔽性强"),
     ],
     "umount": [
         (r"(?:^|\s)-a\b|--all", "umount -a 卸载全部"),
@@ -950,6 +953,48 @@ ADMIN_DESTRUCTIVE_PATTERNS = {
     ],
     "mkfs": [
         (r".*", "mkfs 格式化文件系统"),  # any mkfs.* invocation handled in check_disk_ops too
+    ],
+    # v1.10.0 review gap: chown -R to system dirs
+    "chown": [
+        # -R / -Rh / -RP / -RHP / --recursive all OK
+        (r"(?:^|\s)-[a-zA-Z]*R[a-zA-Z]*\b[^|;&]*?\s/(?:etc|var|usr|bin|sbin|lib|lib64|boot|root|home|dev|proc|sys)(?:/|\s|$)",
+         "chown -R 系统目录 — ownership 转移可锁住系统或开 root 后门"),
+        (r"--recursive\b[^|;&]*?\s/(?:etc|var|usr|bin|sbin|lib|lib64|boot|root|home|dev|proc|sys)(?:/|\s|$)",
+         "chown --recursive 系统目录"),
+        (r"(?:^|\s)-[a-zA-Z]*R[a-zA-Z]*\b[^|;&]*?\s/$", "chown -R / 给整个文件系统改 owner"),
+    ],
+    # v1.10.0 review gap: source/. shell builtin running scripts in current env
+    "source": [
+        (r"(?:^|\s)/etc/profile\.d/", "source /etc/profile.d/* — 让任意脚本以 privileged shell env 跑"),
+        (r"<\(", "source 进程替换 — 动态脚本"),
+        # shlex with punctuation_chars splits `$` and `(` into separate tokens, so
+        # match `$` followed by optional whitespace + `(` to handle both forms.
+        (r"`|\$\s*\(", "source 含 substitution — 动态脚本来源"),
+        (r"\.bashrc|\.profile|\.zshrc", "source 用户 dotfile 后用变量重定义命令 — 隐式投毒"),
+    ],
+    ".": [
+        (r"(?:^|\s)/etc/profile\.d/", ". /etc/profile.d/* — 让任意脚本以 privileged shell env 跑"),
+        (r"<\(", ". 进程替换 — 动态脚本"),
+        (r"`|\$\s*\(", ". 含 substitution — 动态脚本来源"),
+    ],
+    # v1.10.0 review gap: sysctl 危险内核参数
+    "sysctl": [
+        (r"-w\s+kernel\.dmesg_restrict\s*=\s*0",
+         "sysctl 关闭 dmesg_restrict — 泄漏内核信息（CVE 利用前置）"),
+        (r"-w\s+net\.ipv4\.ip_forward\s*=\s*1",
+         "sysctl 开 ip_forward — 让本机变路由器（exfil 通道）"),
+        (r"-w\s+kernel\.unprivileged_userns_clone\s*=\s*1",
+         "sysctl 开 unprivileged_userns — 容器逃逸前置"),
+        (r"-w\s+kernel\.kptr_restrict\s*=\s*0",
+         "sysctl 关 kptr_restrict — 泄漏内核指针"),
+        (r"-w\s+fs\.suid_dumpable\s*=\s*[12]",
+         "sysctl 开 suid_dumpable — 可 dump SUID 进程内存"),
+        (r"-w\s+kernel\.randomize_va_space\s*=\s*0",
+         "sysctl 关 ASLR — 提权利用前置"),
+        (r"-w\s+kernel\.yama\.ptrace_scope\s*=\s*0",
+         "sysctl 关 ptrace_scope — 跨进程读内存"),
+        (r"(?:^|\s)-p\s+\S+",
+         "sysctl -p 从文件加载参数 — 文件内容不可预测"),
     ],
     "fdisk": [
         (r".*", "fdisk 分区操作"),

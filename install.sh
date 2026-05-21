@@ -50,25 +50,38 @@ LOCK_FILE="$CLAUDE_DIR/.anchor.lock"
 touch "$LOCK_FILE"
 exec 9>"$LOCK_FILE"
 # Prefer the `flock` binary (Linux/util-linux). On macOS / minimal images that
-# lack `flock(1)`, fall through to Python `fcntl.flock` so we still serialize.
+# lack `flock(1)`, fall through to Python `fcntl.flock`. If both fail (rare:
+# weird filesystems without lock support), fall to a universal POSIX
+# `mkdir`-atomicity sentinel — never silently lose serialization.
 if command -v flock >/dev/null 2>&1; then
     if ! flock -w 30 9; then
         echo "ERROR: could not acquire $LOCK_FILE within 30s — another install/uninstall is running?" >&2
         exit 1
     fi
-else
-    # Python fallback: acquire and hold the lock for the entire shell lifetime.
-    # The subshell stays alive until trap EXIT, holding the lock by holding fd 9.
-    if ! python3 -c "
+elif python3 -c "
 import fcntl, os, sys
 try:
     fcntl.flock(9, fcntl.LOCK_EX | fcntl.LOCK_NB)
 except OSError:
     sys.exit(1)
 " 2>/dev/null; then
-        # Best-effort: filesystem may not support flock; warn and proceed.
-        echo "WARNING: could not acquire $LOCK_FILE (no flock(1) binary, Python fcntl declined); proceeding without serialization." >&2
+    :  # Python fcntl.flock acquired
+else
+    # v1.10.0 Gap 4: universal POSIX fallback. mkdir is atomic on all
+    # filesystems (no fcntl/flock needed). Previously this branch only WARNED
+    # and proceeded — losing serialization silently. Now: hard fail with clear
+    # recovery instructions, OR successfully acquire a directory-based lock.
+    LOCK_DIR="${LOCK_FILE}.d"
+    if ! mkdir "$LOCK_DIR" 2>/dev/null; then
+        echo "ERROR: cannot acquire lock — no flock(1), Python fcntl declined, and $LOCK_DIR exists." >&2
+        echo "  Possible causes:" >&2
+        echo "    1. Another install/uninstall is genuinely running. Wait + retry." >&2
+        echo "    2. Stale lock from a crashed prior run. If sure no other process: rmdir $LOCK_DIR" >&2
+        echo "    3. Filesystem doesn't support directory creation (extremely unusual)." >&2
+        exit 1
     fi
+    # Release the mkdir-based lock when shell exits.
+    trap 'rmdir "'"$LOCK_DIR"'" 2>/dev/null' EXIT
 fi
 
 # ---- 1. Claude Code: skill + commands ----

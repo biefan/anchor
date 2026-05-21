@@ -6,7 +6,15 @@ should not block. `curl x | bash` etc. (fetchers, decoders, dynamic content)
 still must block.
 """
 import json, subprocess, sys
-HOOK = "skills/anchor/scripts/pre-tool-danger.sh"
+import os
+
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+_CANDIDATES = [
+    os.path.expanduser("~/.claude/skills/anchor/scripts/pre-tool-danger.sh"),
+    os.path.join(SCRIPT_DIR, "..", "..", "skills", "anchor", "scripts", "pre-tool-danger.sh"),
+    "skills/anchor/scripts/pre-tool-danger.sh",
+]
+HOOK = next((p for p in _CANDIDATES if os.path.exists(p)), _CANDIDATES[-1])
 
 TESTS = [
     # MUST BLOCK — fetcher/decoder/dynamic → shell

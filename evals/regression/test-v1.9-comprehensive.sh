@@ -9,8 +9,17 @@
 # command. Switching to if/else would 2x line count for zero behavior change.
 
 set +e
-HOOK_DIR="skills/anchor/scripts"
-CMDS_DIR="commands"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+for _candidate in \
+    "$HOME/.claude/skills/anchor/scripts" \
+    "$SCRIPT_DIR/../../skills/anchor/scripts" \
+    "skills/anchor/scripts"; do
+    if [ -f "$_candidate/pre-tool-danger.sh" ]; then HOOK_DIR="$_candidate"; break; fi
+done
+HOOK_DIR="${HOOK_DIR:-skills/anchor/scripts}"
+CMDS_DIR="$SCRIPT_DIR/../../commands"
+[ -d "$CMDS_DIR" ] || CMDS_DIR="commands"
+REPO_ROOT="$SCRIPT_DIR/../.."
 TMPHOME="/tmp/anchor-test-home-$$"
 mkdir -p "$TMPHOME/.claude/skills" "$TMPHOME/.claude/commands" "$TMPHOME/.anchor"
 
@@ -190,7 +199,7 @@ echo ""
 echo "=== Section E: Templates ==="
 
 # E1: 5 templates exist
-TMPL_DIR="skills/anchor/references/templates"
+TMPL_DIR="$REPO_ROOT/skills/anchor/references/templates"
 for t in web-app library cli-tool data-pipeline default; do
     [ -f "$TMPL_DIR/$t.md" ] && [ -s "$TMPL_DIR/$t.md" ] && continue
     check "E1 template $t exists" FAIL
@@ -203,7 +212,7 @@ echo "=== Section F: install.sh / uninstall.sh idempotency ==="
 # F1: install.sh exits 0
 TEST_HOME="/tmp/anchor-install-test-$$"
 mkdir -p "$TEST_HOME"
-HOME="$TEST_HOME" bash install.sh --no-hooks > /dev/null 2>&1
+HOME="$TEST_HOME" bash "$REPO_ROOT/install.sh" --no-hooks > /dev/null 2>&1
 [ $? -eq 0 ] && check "F1 install.sh --no-hooks exits 0" PASS || check "F1 install.sh --no-hooks exits 0" FAIL
 
 # F2: install.sh creates skill dir
@@ -220,11 +229,11 @@ installed_cmds=$(find "$TEST_HOME/.claude/commands" -maxdepth 1 -name '*.md' 2>/
 [ -x "$TEST_HOME/.claude/skills/anchor/scripts/pitfall-sync.py" ] && check "F5 pitfall-sync.py installed + executable" PASS || check "F5 pitfall-sync.py installed + executable" FAIL
 
 # F6: re-run install — idempotent
-HOME="$TEST_HOME" bash install.sh --no-hooks > /dev/null 2>&1
+HOME="$TEST_HOME" bash "$REPO_ROOT/install.sh" --no-hooks > /dev/null 2>&1
 [ $? -eq 0 ] && check "F6 install re-run idempotent (exits 0)" PASS || check "F6 install re-run idempotent (exits 0)" FAIL
 
 # F7: uninstall
-HOME="$TEST_HOME" bash uninstall.sh > /dev/null 2>&1
+HOME="$TEST_HOME" bash "$REPO_ROOT/uninstall.sh" > /dev/null 2>&1
 [ $? -eq 0 ] && check "F7 uninstall exits 0" PASS || check "F7 uninstall exits 0" FAIL
 [ ! -d "$TEST_HOME/.claude/skills/anchor" ] && check "F7' uninstall removed skill dir" PASS || check "F7' uninstall removed skill dir" FAIL
 
@@ -235,9 +244,9 @@ echo ""
 echo "=== Section G: Plugin manifest validity ==="
 
 # G1: All plugin.json files are valid + version-consistent
-v1=$(python3 -c "import json; print(json.load(open('.claude-plugin/plugin.json'))['version'])" 2>/dev/null)
-v2=$(python3 -c "import json; print(json.load(open('.codex-plugin/plugin.json'))['version'])" 2>/dev/null)
-v3=$(python3 -c "import json; print(json.load(open('.claude-plugin/marketplace.json'))['metadata']['version'])" 2>/dev/null)
+v1=$(python3 -c "import json; print(json.load(open('$REPO_ROOT/.claude-plugin/plugin.json'))['version'])" 2>/dev/null)
+v2=$(python3 -c "import json; print(json.load(open('$REPO_ROOT/.codex-plugin/plugin.json'))['version'])" 2>/dev/null)
+v3=$(python3 -c "import json; print(json.load(open('$REPO_ROOT/.claude-plugin/marketplace.json'))['metadata']['version'])" 2>/dev/null)
 if [ "$v1" = "$v2" ] && [ "$v2" = "$v3" ] && [ -n "$v1" ]; then
     check "G1 3 plugin manifests version-consistent ($v1)" PASS
 else
@@ -245,8 +254,11 @@ else
 fi
 
 # G2: claude-plugin has interface section (required by awesome-codex-plugins)
-python3 -c "import json; d=json.load(open('.codex-plugin/plugin.json')); assert 'interface' in d" 2>/dev/null
-[ $? -eq 0 ] && check "G2 codex-plugin has interface block" PASS || check "G2 codex-plugin has interface block" FAIL
+if python3 -c "import json; d=json.load(open('$REPO_ROOT/.codex-plugin/plugin.json')); assert 'interface' in d" 2>/dev/null; then
+    check "G2 codex-plugin has interface block" PASS
+else
+    check "G2 codex-plugin has interface block" FAIL
+fi
 
 echo ""
 echo "=== Cleanup ==="

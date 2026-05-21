@@ -2,7 +2,15 @@
 """v1.4.5 regression — user-reported B1 (runuser/doas -c) + B2 install fix."""
 import json, subprocess, sys, os
 
-HOOK = "skills/anchor/scripts/pre-tool-danger.sh"
+import os
+
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+_CANDIDATES = [
+    os.path.expanduser("~/.claude/skills/anchor/scripts/pre-tool-danger.sh"),
+    os.path.join(SCRIPT_DIR, "..", "..", "skills", "anchor", "scripts", "pre-tool-danger.sh"),
+    "skills/anchor/scripts/pre-tool-danger.sh",
+]
+HOOK = next((p for p in _CANDIDATES if os.path.exists(p)), _CANDIDATES[-1])
 
 TESTS = [
     # B1: runuser / doas / su variants with -c shell string
