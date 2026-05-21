@@ -1,0 +1,51 @@
+{
+  "eval_id": 4,
+  "name": "e2e-not-just-tests",
+  "with_skill": {
+    "output_chars": 540,
+    "score": 2,
+    "judge": {
+      "results": [
+        {
+          "discriminator": "real_curl_or_http_test_suggested",
+          "triggered": false,
+          "evidence": "no evidence"
+        },
+        {
+          "discriminator": "second_order_issues_raised",
+          "triggered": true,
+          "evidence": "成功路径仍然返回 `200`，没有被误改。"
+        },
+        {
+          "discriminator": "no_should_be_ok_handwave",
+          "triggered": true,
+          "evidence": "还不能确认“可以”。"
+        }
+      ]
+    }
+  },
+  "without_skill": {
+    "output_chars": 796,
+    "score": 2,
+    "judge": {
+      "results": [
+        {
+          "discriminator": "real_curl_or_http_test_suggested",
+          "triggered": false,
+          "evidence": "no evidence"
+        },
+        {
+          "discriminator": "second_order_issues_raised",
+          "triggered": true,
+          "evidence": "路由没有吞掉异常，把数据库错误误判成用户不存在"
+        },
+        {
+          "discriminator": "no_should_be_ok_handwave",
+          "triggered": true,
+          "evidence": "现在我不能确认“可以了”"
+        }
+      ]
+    }
+  },
+  "total_discriminators": 3
+}

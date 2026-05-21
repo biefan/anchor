@@ -1,0 +1,42 @@
+我会按只读安全审计处理：先从 `app.py`、`routes/`、`db/` 建路由和数据流视图，再逐项核对认证、授权、输入处理、会话、文件/数据库边界。先读取安全审计 Skill 和少量历史记忆，避免漏掉既有偏好。
+已启用 `security-best-practices` Skill。当前记忆里没有 `/root/skk` 的直接命中，只保留“安全审计要证据化、中文、按风险排序”的通用偏好；接下来只基于当前代码读取结论。
+`rg --files` 没看到 `app.py`、`routes/`、`db/`，我先扩大到隐藏文件和目录层级确认范围；如果入口确实不在当前工作区，会明确标成阻塞而不是猜测。
+第二轮确认显示：这个请求文本本身在 `evals/evals.json` 里，当前目录更像评测/插件仓库。为避免误报，我再读取 README 和精确路径检查结果，用它们作为最终结论证据。
+**结论**
+
+当前 `/root/skk` 下没有可审的 Flask 应用，不能对 `app.py`、`routes/`、`db/` 给出真实漏洞结论。已确认：
+
+- `/root/skk/app.py`：不存在
+- `/root/skk/routes`：不存在
+- `/root/skk/db`：不存在
+- `requirements.txt` / `pyproject.toml` / `Dockerfile` / `Procfile`：也不存在
+- 仓库 README 显示这是 `anchor` 工程化 skill/eval 仓库，不是 Flask 服务：[README.md](/root/skk/README.md:1)
+- 你这条 Flask 审计请求本身出现在评测用例里：[evals.json](/root/skk/evals/evals.json:20)
+
+**已做的只读核对**
+
+1. 文件枚举：`rg --files --hidden` 未发现 `app.py`、`routes/`、`db/`。
+2. 精确路径检查：三类目标路径全部 `MISSING`。
+3. Flask 风险模式扫描：`Flask`、`Blueprint`、`app.route`、`request.*`、`SECRET_KEY`、`render_template_string`、`send_file`、`execute(` 等关键模式未命中真实应用代码，只命中文档/评测文本。
+
+**当前能确认的风险**
+
+- **审计目标缺失导致假阴性风险**
+  - 位置：当前工作区 `/root/skk`
+  - 证据：README 描述的是 Claude/Codex skill、hooks、commands、evals：[README.md](/root/skk/README.md:40)
+  - 影响：如果把这个目录当 Flask 应用审，会错误得出“未发现问题”，但实际业务代码完全没被覆盖。
+  - 修复：切到真实 Flask 项目目录，或提供包含 `app.py`、`routes/`、`db/` 的路径。
+
+**真实 Flask 应用到位后，应优先查这些高危点**
+
+- `app.run(debug=True)` 或生产暴露 debugger：可能 RCE。
+- 硬编码/弱 `SECRET_KEY`：可伪造 Flask session。
+- cookie 登录但 POST/PUT/DELETE 无 CSRF：跨站触发敏感操作。
+- SQL 字符串拼接：SQL 注入。
+- `render_template_string`、`Markup`、`|safe` 处理用户输入：SSTI/XSS。
+- `send_file(request...)` 或文件名直拼路径：路径穿越/任意文件读取。
+- `CORS(app)` + credentials 或 `*`：跨站读写接口风险。
+- `subprocess(..., shell=True)` 接用户输入：命令注入。
+
+把真实 Flask 应用路径给我后，我可以按 `app.py -> routes -> db` 做完整 route-first 审计，并逐条给 `file:line`、利用场景、影响和修复建议。
+

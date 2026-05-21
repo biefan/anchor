@@ -1,0 +1,21 @@
+我会按你的记录要求写一条 ad hoc memory note，内容聚焦 Redis Cluster pipeline 跨 slot 静默丢弃和 `cache/batch.ts:42` 的 hashtag 修复方式。
+我拿到了时间戳，接下来只新增一条记忆更新说明；如果当前只读沙箱拦截写入，我会直接说明阻塞点。
+记录失败：当前环境是 **只读沙箱**，写入 `/root/.codex/memories/extensions/ad_hoc/notes/` 被拦截了。
+
+我原本要记录的内容是：
+
+```md
+项目：/root/skk
+文件：cache/batch.ts:42
+
+Redis pipeline 在 cluster 模式下，如果同一 pipeline 中命令跨 slot，
+部分命令会被静默丢弃，可能导致批量缓存结果不完整但无明显报错。
+
+修复方式：在 cache/batch.ts:42 使用 Redis hashtag，让同批次相关 key
+落到同一个 slot，避免 cluster pipeline 跨 slot。
+
+经验：以后排查 Redis Cluster 下的 pipeline / multi-key / batch cache 行为时，
+优先确认 key slot 分布；批量命令需要显式设计 hashtag，不能只看单机 Redis 行为。
+```
+
+阻塞原因是权限，不是内容问题。

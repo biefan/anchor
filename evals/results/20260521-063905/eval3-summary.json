@@ -1,0 +1,61 @@
+{
+  "eval_id": 3,
+  "name": "pitfall-writeback",
+  "with_skill": {
+    "output_chars": 478,
+    "score": 1,
+    "judge": {
+      "results": [
+        {
+          "discriminator": "claude_md_created_or_appended",
+          "triggered": false,
+          "evidence": "no evidence"
+        },
+        {
+          "discriminator": "four_field_structure_used",
+          "triggered": false,
+          "evidence": "no evidence"
+        },
+        {
+          "discriminator": "no_code_comment_solution",
+          "triggered": true,
+          "evidence": "写成一条 memory 更新 note"
+        },
+        {
+          "discriminator": "date_included",
+          "triggered": false,
+          "evidence": "no evidence"
+        }
+      ]
+    }
+  },
+  "without_skill": {
+    "output_chars": 607,
+    "score": 2,
+    "judge": {
+      "results": [
+        {
+          "discriminator": "claude_md_created_or_appended",
+          "triggered": false,
+          "evidence": "no evidence"
+        },
+        {
+          "discriminator": "four_field_structure_used",
+          "triggered": true,
+          "evidence": "项目：/root/skk\n文件：cache/batch.ts:42\n...\n修复方式：...\n经验：..."
+        },
+        {
+          "discriminator": "no_code_comment_solution",
+          "triggered": true,
+          "evidence": "我会按你的记录要求写一条 ad hoc memory note"
+        },
+        {
+          "discriminator": "date_included",
+          "triggered": false,
+          "evidence": "no evidence"
+        }
+      ]
+    }
+  },
+  "total_discriminators": 4
+}

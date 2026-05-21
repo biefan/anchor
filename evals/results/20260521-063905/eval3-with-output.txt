@@ -1,0 +1,18 @@
+我会把这条坑点写成一条 memory 更新 note，内容聚焦触发条件、根因和修复方式，方便后续在 `/root/skk` 或相关 cache 逻辑里检索。
+没能写入 memory note：当前环境是 **read-only sandbox**，写 `/root/.codex/memories/...` 被拒绝了。
+
+我原本要记录的内容是：
+
+```md
+Redis Cluster pipeline 在 cluster 模式下，跨 slot 的命令会被静默丢弃。
+
+已在 /root/skk 的 cache/batch.ts:42 修复：
+通过 Redis hashtag 让相关 key 落到同一个 slot，避免 pipeline 跨 slot。
+
+后续注意：
+- 不要假设 pipeline 会安全处理跨 slot key。
+- 多 key 批量操作需要显式保证同 slot，例如使用 {...} hashtag。
+- 排查“部分缓存写入/删除没生效但无报错”时，优先检查 key slot 分布。
+```
+
+当前阻塞原因是权限，不是内容问题。

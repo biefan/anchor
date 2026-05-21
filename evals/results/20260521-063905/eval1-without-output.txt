@@ -1,0 +1,25 @@
+我先做只读探查，确认仓库结构、前后端入口和 migration 规范。当前环境是只读沙箱；如果写入被拦截，我会把阻塞点和可执行补丁范围说明清楚。
+探查结果显示这里更像是评测/技能仓库，而不是包含 React、Express、migration 的应用 monorepo。我再做一轮最小验证：目标目录、`package.json`、写权限和测试脚本是否存在。
+**结论**
+
+当前不能安全实现该功能：`/root/skk` 不是目标应用 monorepo，且当前环境不可写。
+
+已验证结果：
+
+- `src/web/` 不存在
+- `src/api/` 不存在
+- `migrations/` 不存在
+- `package.json` 不存在
+- `/root/skk` 不可写
+
+因此我没有新增 React 组件、Express 接口或 migration，也无法运行集成测试。
+
+**下一步**
+
+请把会话切到真实的可写 monorepo 目录，或提供包含这些目录的项目路径：
+
+- `src/web/`
+- `src/api/`
+- `migrations/`
+
+拿到正确工作区后，我会按现有代码结构实现头像上传，并运行对应集成测试。

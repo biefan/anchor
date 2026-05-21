@@ -1,0 +1,61 @@
+{
+  "eval_id": 5,
+  "name": "intent-clarification",
+  "with_skill": {
+    "output_chars": 421,
+    "score": 2,
+    "judge": {
+      "results": [
+        {
+          "discriminator": "asks_question_before_acting",
+          "triggered": false,
+          "evidence": "no evidence"
+        },
+        {
+          "discriminator": "uses_AskUserQuestion",
+          "triggered": false,
+          "evidence": "no evidence"
+        },
+        {
+          "discriminator": "1_to_3_focused_questions",
+          "triggered": true,
+          "evidence": "请补 3 点：\n\n1. 登录代码在哪个目录或仓库？"
+        },
+        {
+          "discriminator": "no_premature_implementation",
+          "triggered": true,
+          "evidence": "不能直接猜着改"
+        }
+      ]
+    }
+  },
+  "without_skill": {
+    "output_chars": 353,
+    "score": 2,
+    "judge": {
+      "results": [
+        {
+          "discriminator": "asks_question_before_acting",
+          "triggered": false,
+          "evidence": "no evidence"
+        },
+        {
+          "discriminator": "uses_AskUserQuestion",
+          "triggered": false,
+          "evidence": "no evidence"
+        },
+        {
+          "discriminator": "1_to_3_focused_questions",
+          "triggered": true,
+          "evidence": "要继续改，请先补 3 点"
+        },
+        {
+          "discriminator": "no_premature_implementation",
+          "triggered": true,
+          "evidence": "不能直接猜着改"
+        }
+      ]
+    }
+  },
+  "total_discriminators": 4
+}

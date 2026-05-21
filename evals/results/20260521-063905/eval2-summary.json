@@ -1,0 +1,61 @@
+{
+  "eval_id": 2,
+  "name": "multi-pass-vuln-scan",
+  "with_skill": {
+    "output_chars": 1721,
+    "score": 2,
+    "judge": {
+      "results": [
+        {
+          "discriminator": "multiple_scan_passes",
+          "triggered": true,
+          "evidence": "第 1 遍...第 2 遍...第 3 遍"
+        },
+        {
+          "discriminator": "data_flow_analysis_mentioned",
+          "triggered": true,
+          "evidence": "第 2 遍：数据流追踪"
+        },
+        {
+          "discriminator": "codex_review_suggested",
+          "triggered": false,
+          "evidence": "no evidence"
+        },
+        {
+          "discriminator": "exploit_scenario_per_finding",
+          "triggered": false,
+          "evidence": "no evidence"
+        }
+      ]
+    }
+  },
+  "without_skill": {
+    "output_chars": 1789,
+    "score": 2,
+    "judge": {
+      "results": [
+        {
+          "discriminator": "multiple_scan_passes",
+          "triggered": true,
+          "evidence": "第二轮确认显示"
+        },
+        {
+          "discriminator": "data_flow_analysis_mentioned",
+          "triggered": true,
+          "evidence": "建路由和数据流视图"
+        },
+        {
+          "discriminator": "codex_review_suggested",
+          "triggered": false,
+          "evidence": "no evidence"
+        },
+        {
+          "discriminator": "exploit_scenario_per_finding",
+          "triggered": false,
+          "evidence": "no evidence"
+        }
+      ]
+    }
+  },
+  "total_discriminators": 4
+}

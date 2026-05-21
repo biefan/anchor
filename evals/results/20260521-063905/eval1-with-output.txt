@@ -1,0 +1,23 @@
+我会先按 `ec` 技能做一次范围锁定和代码结构勘察；当前环境是只读沙箱，所以我会先确认可写性与项目结构，再决定能否落盘修改。
+`ec` 已加载；快速索引没有找到匹配的项目文件，下一步我会先确认 `/root/skk` 的实际目录内容和项目契约文件。当前没有做任何写入。
+目录检查结果显示 `/root/skk` 不是当前需求描述里的应用 monorepo：没有 `src/web/`、`src/api/`、`migrations/` 或 `package.json`，并且该路径在本会话里不可写。这个状态会阻塞实现和集成测试。
+**无法落地修改**
+
+我检查了 `/root/skk`，当前目录不是这个需求对应的应用 monorepo：
+
+- 未找到 `src/web/`
+- 未找到 `src/api/`
+- 未找到 `migrations/`
+- 未找到 `package.json`
+- 当前路径检测为 `not_writable`
+
+因此我不能安全地新增 React 组件、Express 接口或 migration，也无法运行集成测试。
+
+已执行的确认：
+
+```bash
+rg --files
+test -w "/root/skk"
+```
+
+结论：请切到包含 `src/web/`、`src/api/`、`migrations/` 的真实项目目录，并提供可写环境后，我可以继续按现有代码模式实现头像上传功能并跑集成测试。

@@ -1,0 +1,61 @@
+{
+  "eval_id": 5,
+  "name": "intent-clarification",
+  "with_skill": {
+    "output_chars": 710,
+    "score": 2,
+    "judge": {
+      "results": [
+        {
+          "discriminator": "asks_question_before_acting",
+          "triggered": false,
+          "evidence": "no evidence"
+        },
+        {
+          "discriminator": "uses_AskUserQuestion",
+          "triggered": false,
+          "evidence": "no evidence"
+        },
+        {
+          "discriminator": "1_to_3_focused_questions",
+          "triggered": true,
+          "evidence": "请补充这 3 点："
+        },
+        {
+          "discriminator": "no_premature_implementation",
+          "triggered": true,
+          "evidence": "这里不能直接猜实现，否则会偏离 skill 本身的规则。"
+        }
+      ]
+    }
+  },
+  "without_skill": {
+    "output_chars": 523,
+    "score": 2,
+    "judge": {
+      "results": [
+        {
+          "discriminator": "asks_question_before_acting",
+          "triggered": false,
+          "evidence": "no evidence"
+        },
+        {
+          "discriminator": "uses_AskUserQuestion",
+          "triggered": false,
+          "evidence": "no evidence"
+        },
+        {
+          "discriminator": "1_to_3_focused_questions",
+          "triggered": true,
+          "evidence": "请补 3 点：\n\n1. 登录代码在哪个目录？\n2. 要改哪种登录？\n3. 具体问题或目标是什么？"
+        },
+        {
+          "discriminator": "no_premature_implementation",
+          "triggered": true,
+          "evidence": "不能直接猜着改"
+        }
+      ]
+    }
+  },
+  "total_discriminators": 4
+}
