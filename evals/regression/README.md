@@ -13,8 +13,9 @@ Per-audit-round regression suites for `skills/efficient-coding/scripts/pre-tool-
 | `test-v1.4.5.py` | user-reported round 7 | 10 | runuser/doas/su -c variants + B2 |
 | `test-v1.4.6.py` | user-reported round 8 | 9 | mv to block device + git -c '!cmd' prefix |
 | `test-v1.4.7-pipe.py` | user UX feedback | 17 | pipeline-to-shell false-positive reduction |
+| `test-v1.4.8.py` | user-reported round 11 | 10 | git -c credential.helper pipeline bypass |
 
-**Total**: 162 regression cases across 9 files, 10 audit rounds.
+**Total**: 172 regression cases across 10 files, 11 audit rounds.
 
 ## Running
 

