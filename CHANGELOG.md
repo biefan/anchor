@@ -3,6 +3,37 @@
 All notable changes to **anchor** are tracked here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.1] — 2026-05-21
+
+**Token-savings release**. User feedback: "还要省 token". v1.8.0 's SessionStart was injecting active-task.md (60 lines) + preferences.md (30 lines) on every session = ~900 tokens/session overhead. 4 fixes:
+
+### Added — `/lean` command + toggle file
+
+- **`commands/lean.md`** — toggle `~/.claude/.anchor-lean` flag. When ON, SessionStart skips the `active-task.md` + `preferences.md` injection (still keeps project contracts + git branch + autonomous mode status).
+- **Estimated saving**: ~600 tokens/session for long-task injects, ~300 for prefs = **~900 token/session reduction** when lean mode is on.
+- Trade-off: in lean mode you have to `cat ~/.anchor/active-task.md` or `/recall` manually to get historical context. Worth it for short Q&A sessions.
+
+### Changed — SessionStart smarter (default mode)
+
+Even without lean mode on, SessionStart is more conservative:
+
+1. **active-task.md inject is now project-scoped** — only injects if the `Project:` field inside matches `basename(cwd)`. Previously: injected unconditionally, polluting unrelated sessions with another project's state.
+2. **active-task.md cap reduced 60 → 40 lines** — milestones table is the primary value; deep history available via manual `cat`.
+3. **preferences.md inject conditional** — only if file has >3 lines (skips empty/template files).
+4. **preferences.md cap reduced 30 → 20 lines** — preferences should be terse.
+
+Net default-mode saving: ~200-400 tokens/session depending on file content.
+
+### Verified
+
+- shellcheck PASS on all shell scripts.
+- 13 regression suites / 299/299 pass.
+- Live test: SessionStart in /tmp (no project) → 4 lines output (lean off) / 6 lines (lean on, includes 1 line lean status notice). In real long-task project: lean off ~80 lines, lean on ~10 lines.
+
+### Plugin manifest
+
+- Patch 1.8.0 → 1.8.1.
+
 ## [1.8.0] — 2026-05-21
 
 **Feature release**: unified long-term memory system. v1.7.0 added pitfalls-only cross-project index; v1.8.0 generalizes it to a 7-category memory tree (`~/.anchor/memory/`) + 3 new commands to write into it + upgraded `/recall` to search all of them.

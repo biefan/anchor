@@ -63,35 +63,49 @@ fi
 # v1.7.0: long-task memory — inject ~/.anchor/active-task.md if present.
 # This provides multi-session continuity: yesterday's locked task, last
 # milestone, current branch, recent decisions, open questions all carry over.
-if [ -f "$HOME/.anchor/active-task.md" ]; then
-    echo ""
-    echo "## Active long-task memory (from \`~/.anchor/active-task.md\`)"
-    echo ""
-    # Truncate to first 60 lines to avoid swamping session context
-    head -60 "$HOME/.anchor/active-task.md"
-    total_lines=$(wc -l < "$HOME/.anchor/active-task.md")
-    if [ "$total_lines" -gt 60 ]; then
+# v1.8.1: lean mode — skip non-essential injections to save ~900 tokens/session.
+# Toggle via `touch ~/.claude/.anchor-lean` (cmd: /lean on|off).
+lean_mode=0
+[ -f "$HOME/.claude/.anchor-lean" ] && lean_mode=1
+
+# v1.7.0+: active-task.md inject — but only if project matches (v1.8.1: project-scoped)
+if [ "$lean_mode" = "0" ] && [ -f "$HOME/.anchor/active-task.md" ]; then
+    # v1.8.1: only inject if the saved active-task is for THIS project
+    # (matches by basename of cwd). Avoids polluting unrelated session.
+    project_in_file=$(grep -oE '^\s*-?\s*\*\*Project\*\*[:：]\s*[^\s]+' "$HOME/.anchor/active-task.md" 2>/dev/null | head -1 | sed -E 's/.*\*\*[:：]\s*//')
+    cwd_basename=$(basename "$cwd")
+    if [ -z "$project_in_file" ] || [ "$project_in_file" = "$cwd_basename" ]; then
         echo ""
-        echo "_(... ${total_lines} lines total; \`cat ~/.anchor/active-task.md\` for full history)_"
+        echo "## Active long-task memory (project: ${project_in_file:-$cwd_basename})"
+        echo ""
+        # v1.8.1: cap at 40 lines (was 60) — token-budget-conscious
+        head -40 "$HOME/.anchor/active-task.md"
+        total_lines=$(wc -l < "$HOME/.anchor/active-task.md")
+        if [ "$total_lines" -gt 40 ]; then
+            echo "_(...${total_lines} lines; full: \`cat ~/.anchor/active-task.md\`)_"
+        fi
     fi
-    echo ""
-    echo "→ If this is the SAME long task you were on yesterday, /resume <label> or just continue."
-    echo "→ If unrelated, /lock new scope (anchor will clear/reset active-task on /milestone or /done)."
 fi
 
-# v1.8.0: inject user preferences if present (long-term memory across sessions/projects).
-if [ -f "$HOME/.anchor/memory/preferences.md" ]; then
-    echo ""
-    echo "## User preferences (from \`~/.anchor/memory/preferences.md\`)"
-    echo ""
-    # Cap at 30 lines — preferences should be terse
-    head -30 "$HOME/.anchor/memory/preferences.md"
+# v1.8.0: preferences inject (v1.8.1: lean-mode-aware + shorter cap)
+if [ "$lean_mode" = "0" ] && [ -f "$HOME/.anchor/memory/preferences.md" ]; then
     pref_lines=$(wc -l < "$HOME/.anchor/memory/preferences.md")
-    if [ "$pref_lines" -gt 30 ]; then
-        echo "_(... $pref_lines lines total)_"
+    # Only inject if file is non-trivial (>3 lines, has actual preferences)
+    if [ "$pref_lines" -gt 3 ]; then
+        echo ""
+        echo "## User preferences"
+        echo ""
+        # v1.8.1: cap at 20 lines (was 30) — preferences should be terse
+        head -20 "$HOME/.anchor/memory/preferences.md"
+        if [ "$pref_lines" -gt 20 ]; then
+            echo "_(...$pref_lines lines; full: \`cat ~/.anchor/memory/preferences.md\`)_"
+        fi
     fi
+fi
+
+if [ "$lean_mode" = "1" ]; then
     echo ""
-    echo "→ Apply these throughout the session unless user says otherwise."
+    echo "_(lean mode: SessionStart skipped active-task / preferences inject — \`rm ~/.claude/.anchor-lean\` to restore)_"
 fi
 
 # Log event
