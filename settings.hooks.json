@@ -44,6 +44,17 @@
           }
         ]
       }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$HOME/.claude/skills/anchor/scripts/pre-compact-warning.sh\"",
+            "timeout": 5
+          }
+        ]
+      }
     ]
   },
   "_optional_statusline": "To show ec status in your status bar, set in settings.json: \"statusLine\": { \"type\": \"command\", \"command\": \"bash $HOME/.claude/skills/anchor/scripts/statusline-wrapper.sh\" }. The wrapper assumes you currently use ccstatusline — edit MAIN in the script if you don't."

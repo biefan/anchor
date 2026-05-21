@@ -44,6 +44,17 @@
           }
         ]
       }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/skills/anchor/scripts/pre-compact-warning.sh\"",
+            "timeout": 5
+          }
+        ]
+      }
     ]
   }
 }

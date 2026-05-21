@@ -25,7 +25,20 @@ argument-hint: "[bug 一句话标题，可选]"
 
 3. **优先从对话上下文提取**——如果用户已经在前面讲清楚了现象/根因/修复，直接填入，不要再问。只有信息真的缺才问。
 
-4. **写完后告诉用户**："已把踩坑记录追加到 `./CLAUDE.md`。"
+4. **同步到跨项目记忆系统**（v1.7.0+）：
+   - 让 `~/.anchor/skills/anchor/scripts/pitfall-sync.py` 抽出本次新增的 pitfall entry，copy 一份到 `~/.anchor/pitfalls/<project-slug>/<YYYY-MM-DD>-<short-slug>.md`
+   - project-slug = `basename(cwd)` (去掉特殊字符)
+   - 这样以后 `/recall <keyword>` 能跨项目找类似踩坑
+   - 命令：
+     ```bash
+     python3 ~/.claude/skills/anchor/scripts/pitfall-sync.py \
+         --project "$(basename "$PWD")" \
+         --cwd "$PWD"
+     ```
+
+5. **写完后告诉用户**：
+   - "已把踩坑记录追加到 `./CLAUDE.md`."
+   - "也同步到 `~/.anchor/pitfalls/<project-slug>/`（用 `/recall <keyword>` 跨项目找类似踩坑）"
 
 判断标准（不达标就跳过，告诉用户为啥不写）：6 个月后的自己看到这条会感谢现在的自己——值得写。
 - 写：花 >5 min 定位 / "以为是 A 实际是 B" / 库非直觉行为 / 并发时序 / 测试通过但生产挂 / 反复踩过 2+ 次

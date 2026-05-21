@@ -3,6 +3,56 @@
 All notable changes to **anchor** are tracked here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.0] — 2026-05-21
+
+**Feature release**: long-task continuity + cross-project memory system. Closes the two remaining UX gaps for multi-day / multi-session work.
+
+### Added — Long-task continuity
+
+- **`~/.anchor/active-task.md` 自动维护** — Single source of truth for multi-session task state. Contains: locked task (user's original /lock phrasing), current branch, last milestone, milestone history, recent decisions, open questions. Auto-injected by SessionStart hook on every new session so context carries cleanly from yesterday → today → next week.
+- **`/milestone <name>` command** — mark a phase done in long task. Inserts a 🏁 marker into the task list AND writes to `active-task.md` with metadata (branch, completed tasks since previous milestone, modified files, key decisions, next phase). Use to checkpoint multi-day refactors.
+- **`PreCompact` hook (`pre-compact-warning.sh`)** — fires before Claude Code auto-compacts session context. If task list still has pending/in_progress items, injects a warning advising `/save` BEFORE proceeding. Avoids losing multi-day task state to silent compact.
+- **SessionStart hook now reads `~/.anchor/active-task.md`** — first 60 lines auto-injected at session start so yesterday's locked task, last milestone, and open questions all carry over without manual `/recap`.
+
+### Added — Cross-project memory (pitfalls)
+
+- **`~/.anchor/pitfalls/` aggregate index** — auto-populated. Every `/pit` invocation now runs `pitfall-sync.py` after appending to project's `CLAUDE.md`, extracting the new entry and copying it to `~/.anchor/pitfalls/<project-slug>/<YYYY-MM-DD>-<title-slug>.md`. Each file has metadata header (project, source file, date, sync date) + the 4-field body.
+- **`/recall <keyword>` command** — `grep -lri "<keyword>" ~/.anchor/pitfalls/` to find similar past pitfalls **across all projects**. Output: top 10 matches with title + 现象/根因/教训 (3-5 lines each). Use when you suspect "I've seen this before" — find the past case from 6 months ago in a different project.
+- **`pitfall-sync.py` script** — parses `CLAUDE.md` to find the most-recent pitfall entry (under 踩坑记录 / Known Pitfalls / Lessons Learned section), extracts title + date + body, writes to project-slug subdir. Idempotent (skips if same-title entry already synced).
+
+### Updated
+
+- **`commands/pit.md`** — now also runs `pitfall-sync.py` after CLAUDE.md write. Output message tells user about cross-project sync.
+- **`commands/save.md`** — (unchanged this release; will gain cost-metadata in v1.7.1 if needed)
+- **`settings.hooks.json`** / **`hooks/hooks.json`** — added `PreCompact` event.
+- **`install.sh`** / **`uninstall.sh`** — added `milestone` + `recall` to command loops.
+- **README.md** / **README.en.md** — bumped "16 slash commands + 4 hooks" → "18 slash commands + 5 hooks".
+
+### Why now (vs not earlier)
+
+User feedback after extensive dogfood: "长时间任务和记忆系统" were the two remaining gaps anchor hadn't directly addressed. v1.6.0's `/save`/`/resume` covered cross-session task-list-only continuity; v1.7.0 adds:
+1. **State beyond task list** — branch, decisions, open questions, milestone history (active-task.md)
+2. **Compact-safety** — explicit warning before context truncation (PreCompact hook)
+3. **Multi-session learning** — pitfalls compounding across projects, not just per-project (`~/.anchor/pitfalls/` + `/recall`)
+
+### Verified
+
+- 13 regression suites / 299/299 pass (zero PreToolUse regression).
+- `shellcheck` PASS on all 10 shell scripts.
+- `jsonlint` PASS on all manifests.
+- Live `./install.sh` run: 18 commands + new `pitfall-sync.py` + new `pre-compact-warning.sh` all installed; settings.json has 5 hook events including PreCompact.
+
+### Total surface
+
+- **Slash commands**: 18 (was 16 in v1.6.0)
+- **Hooks**: 5 (was 4) — SessionStart / Stop / PreToolUse / PostToolUse / PreCompact
+- **Skills/scripts**: 9 (was 8) — added pitfall-sync.py
+- **Memory dirs**: `~/.anchor/saved-tasks/`, `~/.anchor/pitfalls/<project>/`, `~/.anchor/active-task.md`
+
+### Plugin manifest
+
+- Minor bump 1.6.0 → 1.7.0.
+
 ## [1.6.0] — 2026-05-21
 
 **Feature release**: 5 new slash commands + 5 init-claude-md templates + playbook docs. Driven by user request: "anchor 已经够稳，加点真有用的板块". This focuses on UX gaps — cost transparency, multi-session continuity, project-onboarding speed — without adding more PreToolUse rules (which has converged after 14 audit rounds).

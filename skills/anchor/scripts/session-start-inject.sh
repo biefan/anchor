@@ -60,6 +60,25 @@ if [ -f "$HOME/.claude/.efficient-coding-autonomous" ]; then
     echo "→ Disable with: \`rm ~/.claude/.efficient-coding-autonomous\`"
 fi
 
+# v1.7.0: long-task memory — inject ~/.anchor/active-task.md if present.
+# This provides multi-session continuity: yesterday's locked task, last
+# milestone, current branch, recent decisions, open questions all carry over.
+if [ -f "$HOME/.anchor/active-task.md" ]; then
+    echo ""
+    echo "## Active long-task memory (from \`~/.anchor/active-task.md\`)"
+    echo ""
+    # Truncate to first 60 lines to avoid swamping session context
+    head -60 "$HOME/.anchor/active-task.md"
+    total_lines=$(wc -l < "$HOME/.anchor/active-task.md")
+    if [ "$total_lines" -gt 60 ]; then
+        echo ""
+        echo "_(... ${total_lines} lines total; \`cat ~/.anchor/active-task.md\` for full history)_"
+    fi
+    echo ""
+    echo "→ If this is the SAME long task you were on yesterday, /resume <label> or just continue."
+    echo "→ If unrelated, /lock new scope (anchor will clear/reset active-task on /milestone or /done)."
+fi
+
 # Log event
 EC_LOG_event="session_start" \
 EC_LOG_cwd="$cwd" \
