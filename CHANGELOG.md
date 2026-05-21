@@ -3,6 +3,28 @@
 All notable changes to **anchor** are tracked here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] — 2026-05-21
+
+### Added (Codex-as-judge auto-grading for stress tests — v1.3-E)
+
+- **`evals/stress/grade.py`** — extracts the post-run rubric from a stress test spec, collects evidence from the sandbox dir (`git log`, `git diff --stat`, file listing, `CLAUDE.md` if present), and asks `codex exec` to evaluate each rubric item with a Pass/Fail/NA verdict + one-line evidence. Renders a markdown report and aggregate score. CLI args: `--stress-id N`, `--transcript FILE`, `--sandbox DIR`, optional `--output FILE` / `--json`.
+- **`evals/stress/README.md`** now documents the `grade.py` workflow end-to-end: prep fixture → `codex exec` into sandbox → extract `item.completed` text to plain transcript → `python3 evals/stress/grade.py ...`.
+
+### Added (First real stress test run + post-mortem — v1.3-A)
+
+- **`evals/results/stress-2-2026-05-21/`** — first end-to-end run of stress test #2 (refactor function preserving behavior). Artifacts captured: agent's transcript, post-run `order_processor.py` and `test_order_processor.py`, `git log`, `git status`, and the auto-generated `grading.md` (3/7 pass / 4/7 fail).
+- **`analysis.md`** in that results dir — what the auto-grader caught that a casual reader would miss, plus suggested rubric refinements (allow N/A when toolchain missing; relax rubric item #1 around commit sequencing).
+
+### Plugin manifest
+
+- Both `.claude-plugin/plugin.json` and `.codex-plugin/plugin.json` bumped 1.2.0 → 1.3.0.
+- `.claude-plugin/marketplace.json` metadata version bumped to match.
+
+### Validated by this run
+
+- The codex-as-judge approach **isn't fooled by the agent's narration**. The transcript said "tests pass"; the judge cross-checked `git log` and the empty post-fixture commit history, and correctly marked rubric item #1 as ❌.
+- Some rubric ❌s were environment-driven (pytest not installed locally, hooks not live under `codex exec`) rather than agent failures — a known limitation. See the analysis doc for spec adjustments to land in v1.4 or v1.3.x.
+
 ## [1.2.0] — 2026-05-21
 
 ### Added (Observability — v1.2-A)

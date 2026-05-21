@@ -68,6 +68,41 @@ Score against this checklist (each test's file has scenario-specific extras):
 
 A score of **6/8 or better** is anchor doing its job. Below that, look at the transcript to find which rule the model dropped and **file a real issue** against this repo with the transcript + ec-status output.
 
-## Optional: turn this into automated tests later
+## Automated grading via codex-as-judge (`grade.py`)
 
-These stress tests are deliberately manual right now — long-task automated grading is hard (the rubric items are partly subjective). If the project grows, an obvious next step is to take the `analyze-events.py` JSON + `git diff --stat` + transcript and feed them through a codex-as-judge pass like `evals/run.py` does for short evals. Out of scope for v1.2.
+`evals/stress/grade.py` takes the products of a stress test run (transcript + sandbox dir) and asks **codex** to evaluate each rubric item from the spec file. It returns a markdown table with `✅ / ❌ / —` per item plus a one-line evidence quote.
+
+```bash
+# 1. Run a stress test (any of the three) via codex exec into a sandbox dir.
+mkdir -p /tmp/stress-2-run && cd /tmp/stress-2-run
+# ... prepare the fixture per the spec's "Pre-flight" section ...
+codex exec --json --skip-git-repo-check --sandbox workspace-write \
+    "<paste the spec's prompt>" \
+    > /tmp/stress-2-run/transcript.json 2>&1
+
+# 2. Extract clean transcript text from the JSON stream (item.completed events)
+python3 -c "
+import json, sys
+for line in open('/tmp/stress-2-run/transcript.json'):
+    try:
+        d = json.loads(line)
+        if d.get('type') == 'item.completed':
+            print(d.get('item', {}).get('text', ''))
+    except: pass
+" > /tmp/stress-2-run/transcript.txt
+
+# 3. Grade
+python3 evals/stress/grade.py \
+    --stress-id 2 \
+    --transcript /tmp/stress-2-run/transcript.txt \
+    --sandbox /tmp/stress-2-run/work    # or wherever the agent worked
+
+# Output: /tmp/stress-2-run/transcript.grading.md (markdown report)
+# Also dumps to stdout.
+```
+
+### Caveats
+
+- The judge sees a truncated transcript (first 6000 chars) — long verbose runs may lose evidence late in the session.
+- Subjective rubric items ("did Claude propose hypotheses out loud?") rely on the judge's reading of the transcript style; it's a single-model evaluator, not a multi-model jury.
+- `grade.py` doesn't run the test itself or modify anything in the sandbox — purely read-only assessment.

@@ -1,0 +1,253 @@
+from datetime import datetime, timezone
+
+import pytest
+
+import order_processor
+
+
+class FixedDateTime:
+    @classmethod
+    def now(cls, tz=None):
+        assert tz is timezone.utc
+        return datetime(2024, 1, 2, 3, 4, 5, tzinfo=timezone.utc)
+
+
+class FakeDB:
+    def __init__(self, calls, *, products=None, coupons=None, order_id=9001):
+        self.calls = calls
+        self.products = products or {}
+        self.coupons = coupons or {}
+        self.order_id = order_id
+
+    def fetchone(self, sql, params):
+        self.calls.append(("db.fetchone", sql, params))
+        if "FROM products" in sql:
+            return self.products.get(params[0])
+        if "FROM coupons" in sql:
+            return self.coupons.get(params[0])
+        raise AssertionError(f"unexpected query: {sql}")
+
+    def execute(self, sql, params):
+        self.calls.append(("db.execute", sql, params))
+        return self.order_id
+
+
+class FakeMailer:
+    def __init__(self, calls, *, error=None):
+        self.calls = calls
+        self.error = error
+
+    def send(self, **kwargs):
+        self.calls.append(("mailer.send", kwargs))
+        if self.error is not None:
+            raise self.error
+
+
+class FakeLogger:
+    def __init__(self, calls):
+        self.calls = calls
+
+    def error(self, message):
+        self.calls.append(("logger.error", message))
+
+    def warning(self, message):
+        self.calls.append(("logger.warning", message))
+
+    def info(self, message):
+        self.calls.append(("logger.info", message))
+
+
+def run_order(raw_input, *, products=None, coupons=None, mailer_error=None, monkeypatch=None):
+    if monkeypatch is not None:
+        monkeypatch.setattr(order_processor, "datetime", FixedDateTime)
+    calls = []
+    result = order_processor.process_order(
+        raw_input,
+        FakeDB(calls, products=products, coupons=coupons),
+        FakeMailer(calls, error=mailer_error),
+        FakeLogger(calls),
+    )
+    return {"result": result, "calls": calls, "input_after": raw_input}
+
+
+def test_parse_error_snapshot():
+    assert run_order("{not json") == {
+        "result": {"ok": False, "error": "bad_json"},
+        "calls": [
+            (
+                "logger.error",
+                "parse failed: Expecting property name enclosed in double quotes: "
+                "line 1 column 2 (char 1)",
+            )
+        ],
+        "input_after": "{not json",
+    }
+
+
+@pytest.mark.parametrize(
+    ("raw_input", "expected_error"),
+    [
+        ([], "not_dict"),
+        ({"customer_email": "bad", "items": [{"sku": "A", "qty": 1}]}, "bad_email"),
+        ({"customer_email": "a@example.com", "items": []}, "no_items"),
+        ({"customer_email": "a@example.com", "items": ["bad"]}, "item_0_not_dict"),
+        ({"customer_email": "a@example.com", "items": [{"sku": "A"}]}, "item_0_missing_fields"),
+        ({"customer_email": "a@example.com", "items": [{"sku": "A", "qty": 0}]}, "item_0_bad_qty"),
+    ],
+)
+def test_validation_error_snapshots(raw_input, expected_error):
+    assert run_order(raw_input) == {
+        "result": {"ok": False, "error": expected_error},
+        "calls": [],
+        "input_after": raw_input,
+    }
+
+
+def test_missing_sku_snapshot(monkeypatch):
+    order = {"customer_email": "buyer@example.com", "items": [{"sku": "MISSING", "qty": 1}]}
+
+    assert run_order(order, monkeypatch=monkeypatch) == {
+        "result": {"ok": False, "error": "sku_MISSING_not_found"},
+        "calls": [
+            (
+                "db.fetchone",
+                "SELECT price, taxable FROM products WHERE sku = ?",
+                ("MISSING",),
+            )
+        ],
+        "input_after": {
+            "customer_email": "buyer@example.com",
+            "items": [{"sku": "MISSING", "qty": 1}],
+        },
+    }
+
+
+def test_success_with_coupon_snapshot(monkeypatch):
+    order = {
+        "customer_email": "buyer@example.com",
+        "items": [{"sku": "A", "qty": 2}, {"sku": "B", "qty": 1}],
+        "coupon": "SAVE10",
+    }
+
+    assert run_order(
+        order,
+        products={
+            "A": {"price": 10.0, "taxable": True},
+            "B": {"price": 5.5, "taxable": False},
+        },
+        coupons={
+            "SAVE10": {
+                "pct": 10,
+                "min_total": 20,
+                "expires_at": "2999-01-01T00:00:00+00:00",
+            }
+        },
+        monkeypatch=monkeypatch,
+    ) == {
+        "result": {"ok": True, "order_id": 9001, "total": 24.39},
+        "calls": [
+            ("db.fetchone", "SELECT price, taxable FROM products WHERE sku = ?", ("A",)),
+            ("db.fetchone", "SELECT price, taxable FROM products WHERE sku = ?", ("B",)),
+            (
+                "db.fetchone",
+                "SELECT pct, min_total, expires_at FROM coupons WHERE code = ?",
+                ("SAVE10",),
+            ),
+            (
+                "db.execute",
+                "INSERT INTO orders (customer_email, subtotal, discount, total, "
+                "items_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                (
+                    "buyer@example.com",
+                    27.1,
+                    2.7100000000000004,
+                    24.39,
+                    '[{"sku": "A", "qty": 2, "unit_price": 10.0, "taxable": true, '
+                    '"line_total": 21.6}, {"sku": "B", "qty": 1, "unit_price": 5.5, '
+                    '"taxable": false, "line_total": 5.5}]',
+                    "2024-01-02T03:04:05+00:00",
+                ),
+            ),
+            (
+                "mailer.send",
+                {
+                    "to": "buyer@example.com",
+                    "subject": "Order #9001 confirmed",
+                    "body": "Thanks! Your order of 2 item(s) totaling $24.39 is being prepared.",
+                },
+            ),
+            ("logger.info", "order 9001 ok: subtotal=27.10 discount=2.71 total=24.39"),
+        ],
+        "input_after": {
+            "customer_email": "buyer@example.com",
+            "items": [
+                {
+                    "sku": "A",
+                    "qty": 2,
+                    "unit_price": 10.0,
+                    "taxable": True,
+                    "line_total": 21.6,
+                },
+                {
+                    "sku": "B",
+                    "qty": 1,
+                    "unit_price": 5.5,
+                    "taxable": False,
+                    "line_total": 5.5,
+                },
+            ],
+            "coupon": "SAVE10",
+        },
+    }
+
+
+def test_mailer_failure_still_logs_success_snapshot(monkeypatch):
+    order = {"customer_email": "buyer@example.com", "items": [{"sku": "A", "qty": 3}]}
+
+    assert run_order(
+        order,
+        products={"A": {"price": 4.0, "taxable": False}},
+        mailer_error=RuntimeError("smtp down"),
+        monkeypatch=monkeypatch,
+    ) == {
+        "result": {"ok": True, "order_id": 9001, "total": 12.0},
+        "calls": [
+            ("db.fetchone", "SELECT price, taxable FROM products WHERE sku = ?", ("A",)),
+            (
+                "db.execute",
+                "INSERT INTO orders (customer_email, subtotal, discount, total, "
+                "items_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                (
+                    "buyer@example.com",
+                    12.0,
+                    0,
+                    12.0,
+                    '[{"sku": "A", "qty": 3, "unit_price": 4.0, "taxable": false, '
+                    '"line_total": 12.0}]',
+                    "2024-01-02T03:04:05+00:00",
+                ),
+            ),
+            (
+                "mailer.send",
+                {
+                    "to": "buyer@example.com",
+                    "subject": "Order #9001 confirmed",
+                    "body": "Thanks! Your order of 1 item(s) totaling $12.00 is being prepared.",
+                },
+            ),
+            ("logger.warning", "mailer failed for order 9001: smtp down"),
+            ("logger.info", "order 9001 ok: subtotal=12.00 discount=0.00 total=12.00"),
+        ],
+        "input_after": {
+            "customer_email": "buyer@example.com",
+            "items": [
+                {
+                    "sku": "A",
+                    "qty": 3,
+                    "unit_price": 4.0,
+                    "taxable": False,
+                    "line_total": 12.0,
+                }
+            ],
+        },
+    }
