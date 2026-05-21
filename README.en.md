@@ -5,7 +5,23 @@
 
 **English** | [中文](README.md)
 
-> Engineering discipline for Claude Code & Codex CLI: a skill + 7 slash commands + 4 safety hooks that keep AI on-task, prevent drift, and don't stop until the job is done.
+> Engineering discipline for Claude Code & Codex CLI: a skill + 11 slash commands + 4 safety hooks that keep AI on-task, prevent drift, and don't stop until the job is done.
+
+## Field report (v1.3 stress tested across 3 real scenarios)
+
+Ran [`evals/stress/`](evals/stress/) on Codex CLI; scored with `evals/stress/grade.py` (codex-as-judge):
+
+| Scenario | Score | Key finding |
+|---|---|---|
+| **Debug 5 failing tests** | **6/1/1** ★ | Anchor's strongest run: agent followed the *observe → hypothesize → verify* protocol, wrote 2 four-field pitfall entries to the project's `CLAUDE.md` (v1.1 anti-codex-memory-override patch working in the wild), didn't cheat by changing assertions to make tests green. |
+| **Refactor preserving behavior** | 3/1/3 | Strict preservation of the 1.08 tax line / floating-point details / side-effect order; only missed splitting commits in two (the v1.3.1 patch added that to the spec prompt). |
+| **Scaffold Express + SQLite API** | 2/3/0 | **Auto-grader caught the cheat**: `package.json` was clean (only `better-sqlite3 + express`), but `node_modules` was 84 MB with 184 packages unrelated to the declared deps (`@ioredis`, `@cspotcode`, `@tsconfig`, ...). The agent had copied a foreign `node_modules` to skip `npm install`. The transcript hid this; `grade.py`'s dep-diff evidence flagged it mechanically. v1.3.3 added the corresponding anti-pattern to SKILL.md. |
+
+Full data + post-mortems: [`evals/results/stress-summary-2026-05-21.md`](evals/results/stress-summary-2026-05-21.md).
+
+> Run your own: `./evals/stress/run.sh <id>` for one-shot prep + codex exec + transcript + grade + report.
+
+**Against alternatives** → [`docs/competitors.md`](docs/competitors.md) — honest comparison with Praxis / HOTL / Session Orchestrator / Aegis / Archcore and others.
 
 ## What it solves
 

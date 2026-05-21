@@ -1,0 +1,56 @@
+"""Order processor — handles intake, validation, pricing, fulfillment, and notification."""
+import json
+import re
+from datetime import datetime, timezone
+
+
+def process_order(raw_input, db, mailer, logger):
+    """Process a single order end-to-end. Don't refactor without tests."""
+    try:
+        order = json.loads(raw_input) if isinstance(raw_input, str) else raw_input
+    except Exception as e:
+        logger.error(f"parse failed: {e}")
+        return {"ok": False, "error": "bad_json"}
+    if not isinstance(order, dict):
+        return {"ok": False, "error": "not_dict"}
+    if "customer_email" not in order or not re.match(r"^[^@]+@[^@]+\.[^@]+$", order["customer_email"]):
+        return {"ok": False, "error": "bad_email"}
+    if "items" not in order or not isinstance(order["items"], list) or len(order["items"]) == 0:
+        return {"ok": False, "error": "no_items"}
+    for i, item in enumerate(order["items"]):
+        if not isinstance(item, dict):
+            return {"ok": False, "error": f"item_{i}_not_dict"}
+        if "sku" not in item or "qty" not in item:
+            return {"ok": False, "error": f"item_{i}_missing_fields"}
+        if not isinstance(item["qty"], int) or item["qty"] <= 0:
+            return {"ok": False, "error": f"item_{i}_bad_qty"}
+    subtotal = 0
+    for item in order["items"]:
+        row = db.fetchone("SELECT price, taxable FROM products WHERE sku = ?", (item["sku"],))
+        if not row:
+            return {"ok": False, "error": f"sku_{item['sku']}_not_found"}
+        line_total = row["price"] * item["qty"]
+        if row["taxable"]:
+            line_total = line_total * 1.08
+        subtotal += line_total
+        item["unit_price"] = row["price"]
+        item["taxable"] = row["taxable"]
+        item["line_total"] = line_total
+    coupon = order.get("coupon")
+    discount = 0
+    if coupon:
+        c_row = db.fetchone("SELECT pct, min_total, expires_at FROM coupons WHERE code = ?", (coupon,))
+        if c_row and c_row["expires_at"] > datetime.now(timezone.utc).isoformat() and subtotal >= c_row["min_total"]:
+            discount = subtotal * (c_row["pct"] / 100.0)
+    total = subtotal - discount
+    order_id = db.execute(
+        "INSERT INTO orders (customer_email, subtotal, discount, total, items_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+        (order["customer_email"], subtotal, discount, total, json.dumps(order["items"]), datetime.now(timezone.utc).isoformat()),
+    )
+    try:
+        mailer.send(to=order["customer_email"], subject=f"Order #{order_id} confirmed",
+                    body=f"Thanks! Your order of {len(order['items'])} item(s) totaling ${total:.2f} is being prepared.")
+    except Exception as e:
+        logger.warning(f"mailer failed for order {order_id}: {e}")
+    logger.info(f"order {order_id} ok: subtotal={subtotal:.2f} discount={discount:.2f} total={total:.2f}")
+    return {"ok": True, "order_id": order_id, "total": total}

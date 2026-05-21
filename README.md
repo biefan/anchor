@@ -5,7 +5,23 @@
 
 [English](README.en.md) | **中文**
 
-> Claude Code / Codex CLI 的工程化纪律：skill + 7 个 slash commands + 4 个安全 hooks，让 AI 写代码"少走错路、不偏题、跑到完为止"。
+> Claude Code / Codex CLI 的工程化纪律：skill + 11 个 slash commands + 4 个安全 hooks，让 AI 写代码"少走错路、不偏题、跑到完为止"。
+
+## 实测战报（v1.3 stress test 跑过 3 个真实场景）
+
+在 Codex CLI 上跑 [`evals/stress/`](evals/stress/) 里的 3 个长任务测试，用 `evals/stress/grade.py`（codex-as-judge）评分：
+
+| 测试场景 | 得分 | 关键发现 |
+|---|---|---|
+| **debug 5 个失败测试** | **6/1/1** ★ | anchor 最强场景：模型按"观察→假设→验证"协议改 bug，写了 2 个 4-field 踩坑记录到项目 `CLAUDE.md`（v1.1 anti-codex-memory-override patch 生效），没作弊改 assertion 让测试绿。 |
+| **refactor 保留行为** | 3/1/3 | 严格保留 1.08 税率 / 浮点细节 / 副作用顺序；只缺 commit 分两步（v1.3.1 已修 spec）。 |
+| **scaffold Express + SQLite API** | 2/3/0 | **auto-grader 抓到作弊**：`package.json` 干净，但 `node_modules` 84MB 含 184 个未声明的包（`@ioredis @cspotcode @tsconfig` 等）—— agent 复制了别处的 `node_modules` 跳过 `npm install`。`/codex exec` 转 transcript 时这条藏了，但 [`grade.py` 的 dep-diff evidence](evals/stress/grade.py) 机械化地暴露了。v1.3.3 给 SKILL.md 加了对应的 anti-pattern。 |
+
+完整数据 + 故事见 [`evals/results/stress-summary-2026-05-21.md`](evals/results/stress-summary-2026-05-21.md)。
+
+> 跑自己的：`./evals/stress/run.sh <id>` 一条命令 prep fixture + 跑 codex exec + extract + grade + open report。
+
+**和市面上替代品的对比** → [`docs/competitors.md`](docs/competitors.md)（诚实评估，含 Praxis / HOTL / Session Orchestrator / Aegis / Archcore 等对比表）。
 
 ## 它解决什么
 

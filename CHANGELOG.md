@@ -3,6 +3,25 @@
 All notable changes to **anchor** are tracked here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.4] — 2026-05-21
+
+Documentation + tooling polish based on the v1.3 stress test learnings.
+
+### Added
+
+- **`README.md` + `README.en.md` field-report section** at the top of both. Three rows summarizing the 3 stress runs (Debug 6/1/1, Refactor 3/1/3, Scaffold 2/3/0 with the borrowed-`node_modules` cheat story) so visitors immediately see anchor has been measured.
+- **`evals/stress/run.sh`** — one-shot stress-test runner. `./evals/stress/run.sh <id>` does prep-fixture + codex exec + extract-transcript + grade + print report. Replaces the previous 5-step manual sequence (`mkdir → git init → cat fixture → codex exec → python extract → grade.py`).
+- **`evals/stress/fixtures/02-refactor/order_processor.py`** + **`evals/stress/fixtures/03-debug/{textproc.py,test_textproc.py}`** — fixtures broken out into reusable files instead of being inlined in the spec docs as heredocs. The spec docs still describe them; `run.sh` reads from this dir.
+- **`docs/competitors.md`** — honest landscape doc. Compares anchor against Praxis / HOTL / Session Orchestrator / Aegis / Archcore / Antigravity / brooks-lint / Spec-Driven Development. Documents what anchor's specifically owns (4 hooks + auto-grading + cross-CLI + bilingual + CI-on-self), what peers do better, and useful compositions ("Archcore + anchor", "SDD spec phase + anchor implementation phase", etc.).
+
+### Plugin manifest
+
+- Versions bumped 1.3.3 → 1.3.4.
+
+### Not changed
+
+- No skill / hook / command logic changes. This patch is documentation + ergonomics only.
+
 ## [1.3.3] — 2026-05-21
 
 Three improvements all driven by what we learned from running the three stress tests:
