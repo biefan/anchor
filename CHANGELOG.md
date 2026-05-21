@@ -3,6 +3,28 @@
 All notable changes to **anchor** are tracked here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.6] — 2026-05-21
+
+User-reported micro-patch (round 8) — found mid-stress-test. Both are low-severity edge cases the v1.4.5 hook missed.
+
+### Fixed — 🟢 Low
+
+- **`mv X /dev/sda` no longer bypasses** `check_redirect_to_device`. v1.4.5 listed `cp` and `install` as block-device-write commands but missed `mv`. `mv /tmp/img /dev/nvme0n1` and `mv /tmp/img /dev/mapper/vg-root` now block alongside cp/install.
+- **`git -c credential.helper='!rm -rf /' clone foo` no longer bypasses**. Git's credential.helper / core.* config keys support a leading `!` prefix meaning "execute the rest as a shell command." The v1.4.4 `check_git_config_injection` checker recognized the suspicious keys but tokenized the value as-is, so `!rm` became basename `!rm` (not `rm`) and `check_rm` missed it. Now strips the leading `!` (and whitespace) before re-tokenizing.
+
+### Added
+
+- **`evals/regression/test-v1.4.6.py`** — 9 cases (mv to 3 device families, git -c with 3 suspicious keys + `!` prefix, 3 regression cases).
+- Suite count: 7 → 8 files, **136 → 145 regression cases**.
+
+### Verified — 145 / 145 across 8 suites
+
+shellcheck PASS, jsonlint PASS.
+
+### Plugin manifest
+
+- Versions bumped 1.4.5 → 1.4.6.
+
 ## [1.4.5] — 2026-05-21
 
 User-reported patch (round 7). Two findings:

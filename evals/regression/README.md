@@ -11,8 +11,9 @@ Per-audit-round regression suites for `skills/efficient-coding/scripts/pre-tool-
 | `test-v1.4.4-codex-r6.py` | codex pass 6 + self r4 H-set | 21 | codex-r6 1-7 + container/orchestrator wrappers |
 | `test-v1.4.4-git-cp-mv.py` | self r4 J/L sets | 15 | git destructive / git config injection / cp/mv to system |
 | `test-v1.4.5.py` | user-reported round 7 | 10 | runuser/doas/su -c variants + B2 |
+| `test-v1.4.6.py` | user-reported round 8 | 9 | mv to block device + git -c '!cmd' prefix |
 
-**Total**: 136 regression cases across 7 files, 8 audit rounds.
+**Total**: 145 regression cases across 8 files, 9 audit rounds.
 
 ## Running
 

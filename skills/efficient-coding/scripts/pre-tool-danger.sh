@@ -599,7 +599,14 @@ def check_git_config_injection(argv):
                          (key_lower.endswith(".smudge") or key_lower.endswith(".clean")))
             if not (key_lower in SUSPICIOUS_GIT_CONFIG_KEYS or is_filter):
                 continue
-            sub_stages, ok = shlex_split_stages(value)
+            # Git's credential.helper / core.* allow a "!shell-command" form
+            # where the leading `!` tells git to execute the rest as a shell
+            # command. Strip the `!` before tokenizing so the inner command
+            # gets scanned normally.
+            inner = value.lstrip()
+            if inner.startswith("!"):
+                inner = inner[1:].lstrip()
+            sub_stages, ok = shlex_split_stages(inner)
             if not ok:
                 return f"git -c {key} 值无法 tokenize — obfuscation"
             for stage_argv in sub_stages or []:
@@ -738,8 +745,8 @@ def check_redirect_to_device(stage_str):
         return "重定向到块设备会覆盖原始磁盘"
     if re.search(rf"\btee\s+(?:-[a-z]\s+)*(?:--?\S+\s+)*{DEV_PAT}\b", stage_str):
         return "tee 写入块设备会覆盖原始磁盘"
-    if re.search(rf"\b(?:cp|install)\s+[^|;&]*?{DEV_PAT}\b", stage_str):
-        return "cp/install 写入块设备会覆盖原始磁盘"
+    if re.search(rf"\b(?:cp|install|mv)\s+[^|;&]*?{DEV_PAT}\b", stage_str):
+        return "cp/install/mv 写入块设备会覆盖原始磁盘"
     return None
 
 
