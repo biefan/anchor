@@ -43,7 +43,7 @@ cp "$SCRIPT_DIR/skills/efficient-coding/references/"*.md "$CLAUDE_DIR/skills/eff
 cp "$SCRIPT_DIR/skills/efficient-coding/scripts/"*.sh "$CLAUDE_DIR/skills/efficient-coding/scripts/"
 chmod +x "$CLAUDE_DIR/skills/efficient-coding/scripts/"*.sh
 cp "$SCRIPT_DIR/commands/"*.md "$CLAUDE_DIR/commands/"
-echo "  ✓ Claude Code: skill + 7 commands"
+echo "  ✓ Claude Code: skill + 11 commands"
 
 # ---- 2. Claude Code hooks (auto-merge into settings.json) ----
 if [ "$WITH_HOOKS" = "1" ]; then
@@ -51,8 +51,17 @@ if [ "$WITH_HOOKS" = "1" ]; then
         BACKUP="$CLAUDE_DIR/settings.json.bak.$(date +%s)"
         cp "$CLAUDE_DIR/settings.json" "$BACKUP"
         python3 - "$SCRIPT_DIR/settings.hooks.json" "$CLAUDE_DIR/settings.json" <<'PYEOF'
-import json, sys
+import json, re, sys
 from pathlib import Path
+
+# Dedup by anchor's own hook script basename, not the full command string.
+# This way we don't double-install when a user has already added the hooks
+# via the plugin marketplace path (which uses ${CLAUDE_PLUGIN_ROOT}/...).
+ANCHOR_SCRIPT_PAT = re.compile(r"efficient-coding/scripts/([\w.-]+\.sh)")
+
+def anchor_key(cmd):
+    m = ANCHOR_SCRIPT_PAT.search(cmd)
+    return ("anchor", m.group(1)) if m else ("other", cmd)
 
 src = json.loads(Path(sys.argv[1]).read_text())
 src_hooks = src.get("hooks", {})
@@ -63,11 +72,11 @@ existing = target.get("hooks", {})
 added = 0
 for event, groups in src_hooks.items():
     existing.setdefault(event, [])
-    existing_cmds = {h["command"] for g in existing[event] for h in g.get("hooks", [])}
+    existing_keys = {anchor_key(h["command"]) for g in existing[event] for h in g.get("hooks", [])}
     for grp in groups:
-        grp_cmds = {h["command"] for h in grp.get("hooks", [])}
-        if grp_cmds & existing_cmds:
-            continue  # already installed
+        grp_keys = {anchor_key(h["command"]) for h in grp.get("hooks", [])}
+        if grp_keys & existing_keys:
+            continue  # already installed (under either path scheme)
         existing[event].append(grp)
         added += 1
 
@@ -102,7 +111,7 @@ if command -v codex >/dev/null 2>&1 && [ -d "$CODEX_DIR" ]; then
         mkdir -p "$CODEX_DIR/skills/$cmd"
         cp "$SCRIPT_DIR/commands/$cmd.md" "$CODEX_DIR/skills/$cmd/SKILL.md"
     done
-    echo "  ✓ Codex CLI: skill + 7 commands"
+    echo "  ✓ Codex CLI: skill + 11 commands"
 fi
 
 echo ""

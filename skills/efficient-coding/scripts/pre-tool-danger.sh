@@ -46,7 +46,7 @@ SAFE_FIRST = {
 CHECKS = [
     (r"git\s+reset\s+--hard\b",
      "git reset --hard 不可逆，会丢失未提交改动"),
-    (r"git\s+push\s+(-f(\s|$)|--force(\s|$)|--force-with-lease(\s|$))",
+    (r"\bgit\s+push\b[^|;&]*?(?:-f\b|--force\b|--force-with-lease\b)",
      "git push --force 会覆盖远端历史，影响所有协作者"),
     (r"\brm\s+-rf?\s+/(\s|$|[^a-zA-Z0-9_])",
      "rm -rf / 或子根目录是灾难性删除"),
@@ -108,7 +108,6 @@ for seg in segments:
             )
             # Log block decision to a side-channel file (env var path) for the
             # bash wrapper to pick up after this python block ends.
-            os.environ_log_block = (pattern, msg, seg[:120])
             try:
                 with open(os.path.expanduser("~/.claude/.ec-last-pretool-block"), "w") as lf:
                     json.dump({"pattern": pattern, "msg": msg, "seg": seg[:120], "cmd": cmd[:300]}, lf)

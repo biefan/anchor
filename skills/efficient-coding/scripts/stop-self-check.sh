@@ -75,19 +75,21 @@ EC_LOG_session_id="$session_id" \
 EC_LOG_pending_count="$pending_count" \
 ec_log_event
 
-python3 <<PYEOF
-import json
-reason = """Autonomous mode is ON — task list still has incomplete items:
-
-$incomplete
-
-By the efficient-coding skill's autonomous-mode rules:
-1. Do not stop. Continue working on the next pending task.
-2. If blocked, use 观察 → 假设 → 验证: state the observation, propose one hypothesis, design a minimal test to refute/confirm. Iterate up to 3 hypotheses before reporting.
-3. Only report a true blocker when you've exhausted self-resolution OR you genuinely need a user decision (high-cost action, ambiguous business choice, missing credential).
-4. See ~/.claude/skills/efficient-coding/references/autonomous-mode.md for the full protocol.
-
-To override and stop anyway: \`rm ~/.claude/.efficient-coding-autonomous\` then end."""
+EC_STOP_INCOMPLETE="$incomplete" python3 - <<'PYEOF'
+import json, os
+incomplete = os.environ.get("EC_STOP_INCOMPLETE", "")
+reason = (
+    "Autonomous mode is ON — task list still has incomplete items:\n\n"
+    f"{incomplete}\n\n"
+    "By the efficient-coding skill's autonomous-mode rules:\n"
+    "1. Do not stop. Continue working on the next pending task.\n"
+    "2. If blocked, use 观察 → 假设 → 验证: state the observation, propose one hypothesis, "
+    "design a minimal test to refute/confirm. Iterate up to 3 hypotheses before reporting.\n"
+    "3. Only report a true blocker when you've exhausted self-resolution OR you genuinely need a "
+    "user decision (high-cost action, ambiguous business choice, missing credential).\n"
+    "4. See ~/.claude/skills/efficient-coding/references/autonomous-mode.md for the full protocol.\n\n"
+    "To override and stop anyway: `rm ~/.claude/.efficient-coding-autonomous` then end."
+)
 print(json.dumps({"decision": "block", "reason": reason}))
 PYEOF
 

@@ -12,8 +12,17 @@
 # Read the input once and reuse it
 input=$(cat)
 
-# MAIN: keep existing statusline behavior
-main=$(echo "$input" | npx -y ccstatusline@latest 2>/dev/null)
+# MAIN: keep existing statusline behavior. Prefer a globally-installed
+# ccstatusline binary if present — `npx -y ccstatusline@latest` triggers a
+# version check on every status-bar refresh, which is slow on weak networks
+# and silently empty offline. Set CCSTATUSLINE_BIN to override.
+if [ -n "${CCSTATUSLINE_BIN:-}" ]; then
+    main=$(echo "$input" | "$CCSTATUSLINE_BIN" 2>/dev/null)
+elif command -v ccstatusline >/dev/null 2>&1; then
+    main=$(echo "$input" | ccstatusline 2>/dev/null)
+else
+    main=$(echo "$input" | npx -y ccstatusline@latest 2>/dev/null)
+fi
 
 # EC: append our status
 ec=$(echo "$input" | bash "$HOME/.claude/skills/efficient-coding/scripts/ec-status.sh" 2>/dev/null)

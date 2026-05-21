@@ -3,6 +3,46 @@
 All notable changes to **anchor** are tracked here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.6] — 2026-05-21
+
+Code-review-driven security + correctness patch. An external reviewer found **12 bugs** across the hook scripts and installers; this release fixes 10 of them (1 left as-is intentionally, 1 was a minor design choice already safe in Python 3).
+
+### Fixed — 🔴 Critical (injection vectors)
+
+- **`post-tool-lint.sh` heredoc shell injection**: the additionalContext-emitting block used `<<PYEOF` (unquoted), so bash expanded `$linter` / `$file` / `$result` before handing the body to Python. A filename like `$(whoami).py` or any backticks in lint output would have been executed by the shell. Now uses `<<'PYEOF'` with `EC_LINT_*` env vars (same pattern `_log_event.sh` already used).
+- **`post-tool-lint.sh` JSON file-path injection**: `python3 -c "json.load(open('$file'))"` broke (or worse) when the filename contained a single quote (e.g. `don't.json`). Now uses `sys.argv[1]` so the shell never interpolates into the Python source.
+- **`stop-self-check.sh` triple-quote injection**: the block message used `<<PYEOF` (unquoted) with `$incomplete` interpolated into a `"""..."""` Python literal. A task subject containing `"""` would have closed the string early and corrupted the JSON output. Now uses `<<'PYEOF'` + `EC_STOP_INCOMPLETE` env var.
+
+### Fixed — 🟠 High (functional bugs)
+
+- **`pre-tool-danger.sh` force-push regex was too tight**: required `-f` / `--force` / `--force-with-lease` to come *immediately* after `git push`, missing common invocations like `git push origin main -f`, `git push -u origin main --force-with-lease`, etc. Pattern relaxed to `\bgit\s+push\b[^|;&]*?(?:-f\b|--force\b|--force-with-lease\b)` — flags can be anywhere in the same shell segment now. Verified by 3 regression tests.
+- **`install.sh` "7 commands" miscount**: the message claimed "7 commands" but the loop installs 11 (v1.2.0 added 4 without updating the string). Now says 11.
+- **`pre-tool-danger.sh` dead line**: `os.environ_log_block = (pattern, msg, seg[:120])` was setting an attribute on the `os.environ` object with no effect. The real logging path already wrote to `~/.claude/.ec-last-pretool-block`. Dead line removed.
+
+### Fixed — 🟡 Medium (robustness)
+
+- **`post-tool-lint.sh` eslint config glob**: `--config "$(dirname "$file")/.eslintrc.*"` lived inside double quotes, so bash didn't expand the glob — the literal string `.eslintrc.*` was passed to eslint, which always failed and silently fell back to the unconfigured run. Removed `--config`; let eslint discover its own config (which it does correctly via `.eslintrc.*`, `eslint.config.js`, `package.json#eslintConfig`).
+- **`_log_event.sh` no lock on concurrent appends**: multiple hooks firing at once could interleave bytes inside a single JSON line. Added `fcntl.flock(LOCK_EX)` around the write; auto-releases on close. Best-effort (filesystems without flock are tolerated).
+- **`install.sh` hook dedup couldn't see plugin-path duplicates**: the dedup keyed on full `command` strings, so a hook installed via the plugin marketplace path (`${CLAUDE_PLUGIN_ROOT}/...`) wouldn't match the same hook installed via `install.sh` (`$HOME/.claude/...`), and re-running would double-register. Now keys on the anchor script's basename (`session-start-inject.sh`, etc.) extracted via regex from either path scheme.
+- **`statusline-wrapper.sh` always called `npx -y ccstatusline@latest`**: that fetches and version-checks on every statusbar refresh — slow on weak networks, silently empty offline. Now prefers `$CCSTATUSLINE_BIN` if set, then a globally-installed `ccstatusline` binary, falling back to `npx` only as last resort.
+
+### Fixed — 🟢 Low
+
+- **`session-start-inject.sh` `.cursor/rules` directory check**: the file presence loop used `[ -f ]`, but `.cursor/rules` is typically a directory, never a file — it would never get reported as a project contract. Now `[ -d ]` is checked separately and the trailing `/` is included in the listing.
+
+### Intentionally left as-is
+
+- The transcript-truncation rubric items in `evals/stress/grade.py` still cap at 6000 chars; this is a memory budget choice, not a bug.
+- `stop-self-check.sh` task-subject `[:80]` slicing: Python 3 slicing is by codepoint, so multi-byte UTF-8 characters can't be split. The reviewer correctly noted "not a real bug" and we agree.
+
+### Acknowledgments
+
+All 10 fixes in this release were prompted by a single external code review pass. Thanks to the reviewer for the depth and precision of the report — especially the 3 injection findings, which were the most important.
+
+### Plugin manifest
+
+- Versions bumped 1.3.5 → 1.3.6.
+
 ## [1.3.5] — 2026-05-21
 
 ### Fixed

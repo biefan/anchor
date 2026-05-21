@@ -25,13 +25,16 @@ except Exception:
 echo "## Efficient-Coding Context"
 echo ""
 
-# Project contracts
+# Project contracts (some are files, .cursor/rules is typically a directory)
 contracts=""
-for f in CLAUDE.md AGENTS.md .cursor/rules .github/instructions.md; do
+for f in CLAUDE.md AGENTS.md .github/instructions.md; do
     if [ -f "$cwd/$f" ]; then
         contracts="$contracts $f"
     fi
 done
+if [ -d "$cwd/.cursor/rules" ]; then
+    contracts="$contracts .cursor/rules/"
+fi
 
 if [ -n "$contracts" ]; then
     echo "**Project contracts present**:$contracts"
