@@ -20,9 +20,10 @@ Closes the four follow-ups identified in the v1.0.0 self-stress-test post-mortem
 
 - Both `.claude-plugin/plugin.json` and `.codex-plugin/plugin.json` bumped `version` from `0.3.0` to `1.1.0`. (The repo went from 0.3 to 1.0 conceptually inside the same session as 1.0; the v1.0 manifest still said 0.3 — fixing that now alongside the v1.1 bump.)
 
-### Marketplace
+### Marketplace submission
 
-- Anchor submitted as a PR to [`anthropics/claude-plugins-official`](https://github.com/anthropics/claude-plugins-official). Once merged, users can install with `/plugin install anchor@claude-plugins-official` in Claude Code or `codex plugin add anchor@claude-plugins-official` in Codex CLI — no more manual `extraKnownMarketplaces` entry.
+- Tried to PR anchor into [`anthropics/claude-plugins-official`](https://github.com/anthropics/claude-plugins-official/pull/1955) — auto-closed by a bot with the message: *"This repo only accepts contributions from Anthropic team members. If you'd like to submit a plugin to the marketplace, please submit your plugin [here](https://clau.de/plugin-directory-submission)."* The PR did create a clean reference entry for `marketplace.json` (16 lines, inserted between `amplitude` and `apollo`, pinned to commit `063cf56`) that the official submission form can reuse.
+- **Correct submission path**: https://clau.de/plugin-directory-submission (Anthropic's plugin-directory submission form). Submission has to come from the project owner via that form; can't be merged via direct PR.
 
 ## [1.0.0] — 2026-05-21
 
