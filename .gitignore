@@ -3,6 +3,10 @@
 # (The eval output .txt and summary .json files in results/<ts>/ are still tracked.)
 evals/results/*/sandbox-*/
 
+# Python
+__pycache__/
+*.py[cod]
+
 # Editors
 .vscode/
 .idea/
