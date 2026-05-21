@@ -11,6 +11,9 @@
 #      - Otherwise, scan the segment against danger patterns.
 #   3. Block on first hit with a clear reason.
 
+# shellcheck source=./_log_event.sh
+. "$(dirname "${BASH_SOURCE[0]}")/_log_event.sh"
+
 EC_HOOK_INPUT="$(cat)" python3 - <<'PYEOF'
 import json
 import os
@@ -103,8 +106,26 @@ for seg in segments:
                 "2. 等用户明确确认\n\n"
                 "用户已明确授权时让用户说\"已确认，执行\"再回来跑。"
             )
+            # Log block decision to a side-channel file (env var path) for the
+            # bash wrapper to pick up after this python block ends.
+            os.environ_log_block = (pattern, msg, seg[:120])
+            try:
+                with open(os.path.expanduser("~/.claude/.ec-last-pretool-block"), "w") as lf:
+                    json.dump({"pattern": pattern, "msg": msg, "seg": seg[:120], "cmd": cmd[:300]}, lf)
+            except Exception:
+                pass
             print(json.dumps({"decision": "block", "reason": reason}))
             sys.exit(0)
 
 sys.exit(0)
 PYEOF
+
+# After python exits: if it wrote a block-marker file, log the event.
+if [ -f "$HOME/.claude/.ec-last-pretool-block" ]; then
+    EC_LOG_event="pretool_blocked" \
+    EC_LOG_pattern="$(python3 -c "import json; print(json.load(open('$HOME/.claude/.ec-last-pretool-block')).get('pattern',''))" 2>/dev/null)" \
+    EC_LOG_msg="$(python3 -c "import json; print(json.load(open('$HOME/.claude/.ec-last-pretool-block')).get('msg',''))" 2>/dev/null)" \
+    EC_LOG_seg="$(python3 -c "import json; print(json.load(open('$HOME/.claude/.ec-last-pretool-block')).get('seg',''))" 2>/dev/null)" \
+    ec_log_event
+    rm -f "$HOME/.claude/.ec-last-pretool-block"
+fi

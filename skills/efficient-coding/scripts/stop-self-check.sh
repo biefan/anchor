@@ -6,6 +6,9 @@
 
 set -e
 
+# shellcheck source=./_log_event.sh
+. "$(dirname "${BASH_SOURCE[0]}")/_log_event.sh"
+
 # Escape hatch: autonomous mode not enabled → allow stop
 if [ ! -f "$HOME/.claude/.efficient-coding-autonomous" ]; then
     exit 0
@@ -57,11 +60,21 @@ PYEOF
 
 # All done → allow stop
 if [ -z "$incomplete" ]; then
+    EC_LOG_event="stop_allowed" \
+    EC_LOG_session_id="$session_id" \
+    EC_LOG_reason="all_tasks_completed" \
+    ec_log_event
     exit 0
 fi
 
 # Block stop and tell Claude to continue
 # Use JSON form so Claude Code parses our reason properly.
+pending_count=$(echo "$incomplete" | wc -l | tr -d ' ')
+EC_LOG_event="stop_blocked" \
+EC_LOG_session_id="$session_id" \
+EC_LOG_pending_count="$pending_count" \
+ec_log_event
+
 python3 <<PYEOF
 import json
 reason = """Autonomous mode is ON — task list still has incomplete items:

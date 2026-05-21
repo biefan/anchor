@@ -21,7 +21,7 @@ if [ -d "$CLAUDE_DIR/skills/efficient-coding" ]; then
 fi
 
 # Commands
-for cmd in lock pit scan "done" next recap init-claude-md; do
+for cmd in lock pit scan "done" next recap init-claude-md status ship diff cleanup; do
     if [ -f "$CLAUDE_DIR/commands/$cmd.md" ]; then
         echo "→ Removing $CLAUDE_DIR/commands/$cmd.md"
         rm -f "$CLAUDE_DIR/commands/$cmd.md"
@@ -46,7 +46,7 @@ if [ -d "$CODEX_DIR/skills/ec" ]; then
     rmdir "$CODEX_DIR/skills/ec" 2>/dev/null || true
 fi
 # Codex commands-as-skills
-for cmd in lock pit scan "done" next recap init-claude-md; do
+for cmd in lock pit scan "done" next recap init-claude-md status ship diff cleanup; do
     if [ -d "$CODEX_DIR/skills/$cmd" ]; then
         echo "→ Removing $CODEX_DIR/skills/$cmd/"
         rm -f "$CODEX_DIR/skills/$cmd/SKILL.md"

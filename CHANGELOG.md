@@ -3,6 +3,42 @@
 All notable changes to **anchor** are tracked here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] — 2026-05-21
+
+### Added (Observability — v1.2-A)
+
+- **Hook event logging**: all 4 hooks (`SessionStart` / `Stop` / `PreToolUse` / `PostToolUse`) now append a structured JSON line to `~/.claude/anchor-events.jsonl` when they trigger something interesting (session start, stop allow/block decision, PreToolUse block, PostToolUse lint hits). New `_log_event.sh` helper is sourced by each hook for DRY.
+- **`/status` command**: shows autonomous-mode toggle, current session task list breakdown, and the last 7 days of hook events as a markdown summary. Args: `--all`, `--days N`, `--json`.
+- **`scripts/analyze-events.py`**: parses the jsonl event log into a markdown or JSON summary; `/status` calls it.
+
+### Added (Workflow commands — v1.2-B)
+
+- **`/ship`** — one-shot wrap-up: runs `/done`, generates a Conventional-Commits PR title, drafts a body with summary + how-tested + risk + linked issues, pushes the branch, calls `gh pr create`.
+- **`/diff [base|file]`** — read-only diff risk analyzer: scope, file count + LOC, red/yellow/green keyword scan (auth / payment / crypto / migration / concurrency), then concrete second-order questions targeted at what changed. Outputs a one-line ship verdict.
+- **`/cleanup`** — scans changed files for debug `print` / `console.log` / `debugger` / `pdb` / unused imports / `TODO` / `FIXME` per language (Python / JS-TS / Go / Rust / shell). Reports only; doesn't auto-modify.
+
+### Added (Self-marketplace — v1.2-C)
+
+- **`.claude-plugin/marketplace.json`**: anchor's repo is now its own single-plugin marketplace. Users add `extraKnownMarketplaces.anchor` + `enabledPlugins["anchor@anchor"]` to settings.json and they're installed — no waiting for the Anthropic directory.
+
+### Added (Long-task stress tests — v1.2-D)
+
+- **`evals/stress/`**: three multi-turn task templates (scaffold mini-project / refactor function preserving behavior / debug failing tests via observe-hypothesize-verify) with pre-flight setup, paste-verbatim prompt, what-to-watch-for narration, and post-run rubrics. Designed to expose anchor's long-task structural value (which short Q&A evals can't measure).
+- README explains why short and long evals measure different things, plus a universal 8-item post-run rubric.
+
+### Added (Multi-CLI adapters — v1.2-E)
+
+- **`references/multi-cli-adapters.md`**: how to install anchor's `SKILL.md` content into Cursor (`.cursor/rules/anchor.mdc`), Cline (`.clinerules`), and Aider (`AI_RULES.md` via `.aider.conf.yml read:`). Each section includes a copy-paste install snippet, what carries over, what doesn't (hooks + slash commands don't), and how to mitigate the gaps. Manual by design — auto-detection of project-level tools is too risky to default on.
+
+### Plugin manifest
+
+- Both `.claude-plugin/plugin.json` and `.codex-plugin/plugin.json` bumped 1.1.0 → 1.2.0.
+
+### Fixed
+
+- **shellcheck SC2148**: `_log_event.sh` is sourced (no shebang); added `# shellcheck shell=bash` directive so shellcheck stops complaining.
+- 4 places updated the command-name list from 7 to 11 (`status`, `ship`, `diff`, `cleanup` added): `install.sh`, `uninstall.sh`, `.github/workflows/ci.yml`, README structure listing.
+
 ## [1.1.0] — 2026-05-21
 
 Closes the four follow-ups identified in the v1.0.0 self-stress-test post-mortem.

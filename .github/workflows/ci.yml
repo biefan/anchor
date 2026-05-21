@@ -52,7 +52,7 @@ jobs:
           set -e
           test -f "$HOME/.claude/skills/efficient-coding/SKILL.md" || { echo "SKILL.md missing"; exit 1; }
           test -x "$HOME/.claude/skills/efficient-coding/scripts/stop-self-check.sh" || { echo "stop-self-check.sh missing/not executable"; exit 1; }
-          for cmd in lock pit scan "done" next recap init-claude-md; do
+          for cmd in lock pit scan "done" next recap init-claude-md status ship diff cleanup; do
             test -f "$HOME/.claude/commands/$cmd.md" || { echo "command $cmd.md missing"; exit 1; }
           done
           echo "All expected files present."
@@ -75,7 +75,7 @@ jobs:
             echo "ERROR: skill dir not removed"
             exit 1
           fi
-          for cmd in lock pit scan "done" next recap init-claude-md; do
+          for cmd in lock pit scan "done" next recap init-claude-md status ship diff cleanup; do
             if [ -f "$HOME/.claude/commands/$cmd.md" ]; then
               echo "ERROR: $cmd.md not removed"; exit 1
             fi

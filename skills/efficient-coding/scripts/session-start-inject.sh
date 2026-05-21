@@ -5,6 +5,9 @@
 
 set -e
 
+# shellcheck source=./_log_event.sh
+. "$(dirname "${BASH_SOURCE[0]}")/_log_event.sh"
+
 # Read hook input
 input=$(cat)
 
@@ -45,11 +48,19 @@ if [ -d "$cwd/.git" ] || git -C "$cwd" rev-parse --git-dir >/dev/null 2>&1; then
 fi
 
 # Autonomous mode status
+autonomous="off"
 if [ -f "$HOME/.claude/.efficient-coding-autonomous" ]; then
+    autonomous="on"
     echo ""
     echo "**Autonomous mode**: ENABLED. Stop hook will block stop while task list has incomplete items."
     echo "→ Treat the current user task as long-running; self-resolve obstacles; only stop to report a true blocker."
     echo "→ Disable with: \`rm ~/.claude/.efficient-coding-autonomous\`"
 fi
+
+# Log event
+EC_LOG_event="session_start" \
+EC_LOG_cwd="$cwd" \
+EC_LOG_autonomous="$autonomous" \
+ec_log_event
 
 exit 0

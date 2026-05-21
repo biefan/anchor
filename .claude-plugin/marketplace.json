@@ -1,0 +1,25 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "anchor",
+  "description": "anchor — engineering-discipline pack for Claude Code & Codex CLI. Single-plugin marketplace so users can install anchor without waiting for Anthropic's directory.",
+  "owner": {
+    "name": "biefan",
+    "url": "https://github.com/biefan"
+  },
+  "metadata": {
+    "version": "1.2.0"
+  },
+  "plugins": [
+    {
+      "name": "anchor",
+      "description": "Engineering discipline pack: skill + 11 slash commands + 4 safety hooks. Keeps AI on-task on long tasks (TaskCreate-anchored scope, anti-drift braking, optional autonomous mode that blocks 'stop' until tasks complete), enforces end-to-end verification + multi-pass vulnerability scanning + condition-based codex review + project-CLAUDE.md pitfall writeback, and blocks irreversible bash commands via PreToolUse hook. Cross-CLI by design.",
+      "author": {
+        "name": "biefan",
+        "url": "https://github.com/biefan"
+      },
+      "category": "development",
+      "source": "./",
+      "homepage": "https://github.com/biefan/anchor"
+    }
+  ]
+}

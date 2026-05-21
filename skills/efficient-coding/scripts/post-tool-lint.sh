@@ -5,6 +5,9 @@
 
 set -e
 
+# shellcheck source=./_log_event.sh
+. "$(dirname "${BASH_SOURCE[0]}")/_log_event.sh"
+
 input=$(cat)
 
 tool=$(echo "$input" | python3 -c "
@@ -94,6 +97,13 @@ esac
 result=$(echo "$result" | head -30 | sed '/^$/d')
 
 if [ -n "$result" ]; then
+    issue_count=$(echo "$result" | wc -l | tr -d ' ')
+    EC_LOG_event="posttool_lint_issue" \
+    EC_LOG_file="$file" \
+    EC_LOG_linter="$linter" \
+    EC_LOG_issue_count="$issue_count" \
+    ec_log_event
+
     python3 <<PYEOF
 import json
 out = """$linter found issues in $file:
