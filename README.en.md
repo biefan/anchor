@@ -7,17 +7,22 @@
 
 > Engineering discipline for Claude Code & Codex CLI: a skill + 11 slash commands + 4 safety hooks that keep AI on-task, prevent drift, and don't stop until the job is done.
 
-## Field report (v1.3 stress tested across 3 real scenarios)
+## Field report (v1.4.6 re-run across 3 real scenarios)
 
-Ran [`evals/stress/`](evals/stress/) on Codex CLI; scored with `evals/stress/grade.py` (codex-as-judge):
+Ran [`evals/stress/`](evals/stress/) on Codex CLI; scored with `evals/stress/grade.py` (codex-as-judge). This is the **v1.4.6 re-run** after 9 audit rounds / 123 bug fixes:
 
-| Scenario | Score | Key finding |
-|---|---|---|
-| **Debug 5 failing tests** | **6/1/1** ★ | Anchor's strongest run: agent followed the *observe → hypothesize → verify* protocol, wrote 2 four-field pitfall entries to the project's `CLAUDE.md` (v1.1 anti-codex-memory-override patch working in the wild), didn't cheat by changing assertions to make tests green. |
-| **Refactor preserving behavior** | 3/1/3 | Strict preservation of the 1.08 tax line / floating-point details / side-effect order; only missed splitting commits in two (the v1.3.1 patch added that to the spec prompt). |
-| **Scaffold Express + SQLite API** | 2/3/0 | **Auto-grader caught the cheat**: `package.json` was clean (only `better-sqlite3 + express`), but `node_modules` was 84 MB with 184 packages unrelated to the declared deps (`@ioredis`, `@cspotcode`, `@tsconfig`, ...). The agent had copied a foreign `node_modules` to skip `npm install`. The transcript hid this; `grade.py`'s dep-diff evidence flagged it mechanically. v1.3.3 added the corresponding anti-pattern to SKILL.md. |
+| Scenario | v1.3 baseline | v1.4.6 re-run | Key finding |
+|---|---|---|---|
+| **Debug 5 failing tests** | 6/1/1 | **5/2/1** | All anchor core rules passed: observe→hypothesize→verify ✓, didn't modify tests ✓, truncate/word_count fixed correctly ✓. Mild regression: CLAUDE.md was written but as a bullet list, not the 4-field template. |
+| **Refactor preserving behavior** | 3/1/3 | **3/1/3** | Identical — 1.08 tax line / floating-point details / side-effect order all preserved; only missed splitting commits in two. |
+| **Scaffold Express + SQLite API** | 2/3/0 | **3/2/2** ★ | **anti-borrow-deps rule closed the loop in production**: the cheat caught in v1.3 (borrowed `node_modules` from elsewhere) **did not happen** in v1.4.6 — agent explicitly said *"I can't install dependencies here; please run `npm install` locally"*. |
+| **Total** | 11/5/4 (20) | **11/5/6 (22)** | Same pass count → the v1.4.x PreToolUse rewrite didn't break normal usage. |
 
-Full data + post-mortems: [`evals/results/stress-summary-2026-05-21.md`](evals/results/stress-summary-2026-05-21.md).
+**Most informative finding** (v1.4.6 full cross-scenario loop):
+
+> v1.3 stress #1 → `grade.py` caught the borrowed-`node_modules` cheat → v1.3.3 added the anti-pattern to SKILL.md → v1.4.6 stress #1 re-run: agent correctly reports the blocker and stops, **cheat doesn't recur**. Full three-stage closed loop: `grade.py → SKILL.md → field validation`.
+
+Full data + cross-stress comparison + improvement suggestions → [`evals/results/stress-2026-05-21-v1.4.6/cross-summary.md`](evals/results/stress-2026-05-21-v1.4.6/cross-summary.md) (includes v1.3 baseline comparison, anti-borrow-deps loop story, real-world data with 1491 PreToolUse block events).
 
 > Run your own: `./evals/stress/run.sh <id>` for one-shot prep + codex exec + transcript + grade + report.
 

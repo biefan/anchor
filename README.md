@@ -7,17 +7,22 @@
 
 > Claude Code / Codex CLI 的工程化纪律：skill + 11 个 slash commands + 4 个安全 hooks，让 AI 写代码"少走错路、不偏题、跑到完为止"。
 
-## 实测战报（v1.3 stress test 跑过 3 个真实场景）
+## 实测战报（v1.4.6 跑过 3 个真实场景）
 
-在 Codex CLI 上跑 [`evals/stress/`](evals/stress/) 里的 3 个长任务测试，用 `evals/stress/grade.py`（codex-as-judge）评分：
+在 Codex CLI 上跑 [`evals/stress/`](evals/stress/) 里的 3 个长任务测试，用 `evals/stress/grade.py`（codex-as-judge）评分。这次是 9 轮 audit / 123 bug 修后的 **v1.4.6** 重跑：
 
-| 测试场景 | 得分 | 关键发现 |
-|---|---|---|
-| **debug 5 个失败测试** | **6/1/1** ★ | anchor 最强场景：模型按"观察→假设→验证"协议改 bug，写了 2 个 4-field 踩坑记录到项目 `CLAUDE.md`（v1.1 anti-codex-memory-override patch 生效），没作弊改 assertion 让测试绿。 |
-| **refactor 保留行为** | 3/1/3 | 严格保留 1.08 税率 / 浮点细节 / 副作用顺序；只缺 commit 分两步（v1.3.1 已修 spec）。 |
-| **scaffold Express + SQLite API** | 2/3/0 | **auto-grader 抓到作弊**：`package.json` 干净，但 `node_modules` 84MB 含 184 个未声明的包（`@ioredis @cspotcode @tsconfig` 等）—— agent 复制了别处的 `node_modules` 跳过 `npm install`。`/codex exec` 转 transcript 时这条藏了，但 [`grade.py` 的 dep-diff evidence](evals/stress/grade.py) 机械化地暴露了。v1.3.3 给 SKILL.md 加了对应的 anti-pattern。 |
+| 测试场景 | v1.3 baseline | v1.4.6 重跑 | 关键发现 |
+|---|---|---|---|
+| **debug 5 个失败测试** | 6/1/1 | **5/2/1** | anchor 核心规则全过：观察→假设→验证 ✓、没改 test ✓、truncate/word_count 修对 ✓；CLAUDE.md format 轻微 regression（写了但 bullet list 不是 4-field） |
+| **refactor 保留行为** | 3/1/3 | **3/1/3** | 完全一样 — 严格保留 1.08 税率 / 浮点细节 / 副作用顺序，只缺 commit 分两步 |
+| **scaffold Express + SQLite API** | 2/3/0 | **3/2/2** ★ | **anti-borrow-deps 规则在 production 闭环**：v1.3 抓到的 cheat（借别处 node_modules）在 v1.4.6 **没复现**——agent 显式说 *"我没法在这里装依赖，请你在本地跑 `npm install` 再跑测试"* |
+| **总计** | 11/5/4 (20) | **11/5/6 (22)** | 同 pass 数 = v1.4.x PreToolUse 大改没引入正常使用 regression |
 
-完整数据 + 故事见 [`evals/results/stress-summary-2026-05-21.md`](evals/results/stress-summary-2026-05-21.md)。
+**最有信号的 finding**（v1.4.6 跨场景闭环）：
+
+> v1.3 stress #1 → `grade.py` 抓到 agent 借 node_modules → v1.3.3 SKILL.md 加 anti-pattern → v1.4.6 stress #1 同场景 agent 正确报告 blocker 并停下，**作弊行为没复现**。`grade.py → SKILL.md → 实测验证`三段闭环。
+
+完整数据 + 跨 stress 比较 + 改进建议 → [`evals/results/stress-2026-05-21-v1.4.6/cross-summary.md`](evals/results/stress-2026-05-21-v1.4.6/cross-summary.md)（含 v1.3 baseline 对比、anti-borrow-deps 闭环故事、PreToolUse 在 1491 个 block 事件下的真实使用数据）。
 
 > 跑自己的：`./evals/stress/run.sh <id>` 一条命令 prep fixture + 跑 codex exec + extract + grade + open report。
 
