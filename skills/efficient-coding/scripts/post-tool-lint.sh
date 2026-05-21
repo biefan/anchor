@@ -34,7 +34,7 @@ except Exception:
 
 # Skip files inside .claude/ (don't lint our own skill/commands/hook config)
 case "$file" in
-    *.claude/*|*/.claude/*) exit 0 ;;
+    */.claude/*) exit 0 ;;
 esac
 
 result=""

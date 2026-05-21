@@ -98,7 +98,7 @@ if command -v codex >/dev/null 2>&1 && [ -d "$CODEX_DIR" ]; then
     cp "$SCRIPT_DIR/skills/efficient-coding/references/"*.md "$CODEX_DIR/skills/ec/references/"
     cp "$SCRIPT_DIR/skills/efficient-coding/scripts/"*.sh "$CODEX_DIR/skills/ec/scripts/"
     chmod +x "$CODEX_DIR/skills/ec/scripts/"*.sh
-    for cmd in lock pit scan done next recap init-claude-md; do
+    for cmd in lock pit scan "done" next recap init-claude-md; do
         mkdir -p "$CODEX_DIR/skills/$cmd"
         cp "$SCRIPT_DIR/commands/$cmd.md" "$CODEX_DIR/skills/$cmd/SKILL.md"
     done
