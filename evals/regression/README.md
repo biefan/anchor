@@ -10,8 +10,9 @@ Per-audit-round regression suites for `skills/efficient-coding/scripts/pre-tool-
 | `test-v1.4.3-codex-r5.py` | codex pass 5 + self r3 | 18 | G1-G7 + F14-F16 (heredoc body / flock-c / docker/kubectl/ssh) |
 | `test-v1.4.4-codex-r6.py` | codex pass 6 + self r4 H-set | 21 | codex-r6 1-7 + container/orchestrator wrappers |
 | `test-v1.4.4-git-cp-mv.py` | self r4 J/L sets | 15 | git destructive / git config injection / cp/mv to system |
+| `test-v1.4.5.py` | user-reported round 7 | 10 | runuser/doas/su -c variants + B2 |
 
-**Total**: 126 regression cases across 6 files, 7 audit rounds.
+**Total**: 136 regression cases across 7 files, 8 audit rounds.
 
 ## Running
 

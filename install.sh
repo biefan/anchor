@@ -79,7 +79,8 @@ mkdir -p "$CLAUDE_DIR/commands"
 cp "$SCRIPT_DIR/skills/efficient-coding/SKILL.md" "$CLAUDE_DIR/skills/efficient-coding/"
 cp "$SCRIPT_DIR/skills/efficient-coding/references/"*.md "$CLAUDE_DIR/skills/efficient-coding/references/"
 cp "$SCRIPT_DIR/skills/efficient-coding/scripts/"*.sh "$CLAUDE_DIR/skills/efficient-coding/scripts/"
-chmod +x "$CLAUDE_DIR/skills/efficient-coding/scripts/"*.sh
+cp "$SCRIPT_DIR/skills/efficient-coding/scripts/"*.py "$CLAUDE_DIR/skills/efficient-coding/scripts/"
+chmod +x "$CLAUDE_DIR/skills/efficient-coding/scripts/"*.sh "$CLAUDE_DIR/skills/efficient-coding/scripts/"*.py
 cp "$SCRIPT_DIR/commands/"*.md "$CLAUDE_DIR/commands/"
 echo "  ✓ Claude Code: skill + 11 commands"
 
@@ -237,7 +238,8 @@ if command -v codex >/dev/null 2>&1 && [ -d "$CODEX_DIR" ]; then
     cp "$SCRIPT_DIR/skills/efficient-coding/SKILL.md" "$CODEX_DIR/skills/ec/"
     cp "$SCRIPT_DIR/skills/efficient-coding/references/"*.md "$CODEX_DIR/skills/ec/references/"
     cp "$SCRIPT_DIR/skills/efficient-coding/scripts/"*.sh "$CODEX_DIR/skills/ec/scripts/"
-    chmod +x "$CODEX_DIR/skills/ec/scripts/"*.sh
+    cp "$SCRIPT_DIR/skills/efficient-coding/scripts/"*.py "$CODEX_DIR/skills/ec/scripts/"
+    chmod +x "$CODEX_DIR/skills/ec/scripts/"*.sh "$CODEX_DIR/skills/ec/scripts/"*.py
     for cmd in lock pit scan "done" next recap init-claude-md status ship diff cleanup; do
         mkdir -p "$CODEX_DIR/skills/$cmd"
         cp "$SCRIPT_DIR/commands/$cmd.md" "$CODEX_DIR/skills/$cmd/SKILL.md"

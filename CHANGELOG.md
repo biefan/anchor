@@ -3,6 +3,31 @@
 All notable changes to **anchor** are tracked here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.5] — 2026-05-21
+
+User-reported patch (round 7). Two findings:
+
+### Fixed — 🟡 Medium (real bug)
+
+- **B2 `install.sh` never copied `analyze-events.py`**: only `cp *.sh`, missing `.py`. The `/status` slash command calls `analyze-events.py`, which would have errored "file not found" on any clean install. Now copies both `.sh` and `.py` (and chmods both) in both the Claude Code and Codex sections.
+
+### Fixed — 🟢 Low (defense-in-depth)
+
+- **B1 runuser/doas/su -c wrapper symmetry**: v1.4.4 had explicit "don't unwrap if -c present" for `flock`/`script`/`runuser` so `check_shell_dash_c` would see the wrapper. `doas`/`su` were relying on post-unwrap `check_rm` catching the target. All variants blocked correctly in testing (10/10), but the asymmetry was confusing — added `doas` and `su` to the explicit list.
+
+### Added
+
+- **`evals/regression/test-v1.4.5.py`** with 10 cases covering runuser/doas/su variants + safe regressions.
+- Test suite count: 6 → 7 files, **126 → 136 regression cases**.
+
+### Verified — 136 / 136 across 7 suites
+
+shellcheck PASS, jsonlint PASS, fresh-install dry-run confirms `analyze-events.py` lands at `~/.claude/skills/efficient-coding/scripts/`.
+
+### Plugin manifest
+
+- Versions bumped 1.4.4 → 1.4.5.
+
 ## [1.4.4] — 2026-05-21
 
 Sixth-pass audit (codex r6 + self r4). Codex r6 gave verdict **"not converged, 7 more wrapper-shaped bugs to fix + CI integration of regression suite"**. Self-audit r4 added 16 in parallel — heavy on container/orchestrator wrappers. This release fixes **23 issues + adds CI-integrated regression suite** per codex r6's full closure conditions.

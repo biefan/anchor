@@ -223,10 +223,12 @@ def strip_env_assignments_and_wrappers(tokens):
                 for a in tokens[i + 1:]
             ):
                 break
-            # G2/v1.4.4: shell-string-taking wrappers — don't unwrap so
-            # check_shell_dash_c sees them.
+            # G2/v1.4.4 + B1/v1.4.5: shell-string-taking wrappers — don't
+            # unwrap so check_shell_dash_c sees them. doas added in v1.4.5
+            # for symmetry with runuser/su (was relying on check_rm post-unwrap;
+            # explicit safeguard is more defense-in-depth).
             SHELL_STRING_FLAGS_INLINE = {"-c", "--command", "--session-command"}
-            if wname in ("flock", "script", "runuser") and any(
+            if wname in ("flock", "script", "runuser", "doas", "su") and any(
                 a in SHELL_STRING_FLAGS_INLINE
                 or a.startswith("--command=")
                 or a.startswith("--session-command=")
