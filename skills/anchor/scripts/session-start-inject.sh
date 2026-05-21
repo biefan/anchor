@@ -103,9 +103,50 @@ if [ "$lean_mode" = "0" ] && [ -f "$HOME/.anchor/memory/preferences.md" ]; then
     fi
 fi
 
+# v1.9.0: project-scoped memory index — show Claude what's remembered ABOUT THIS PROJECT.
+# Without this, /pit /decide /remember are "write-only" — saved to disk but never
+# proactively surfaced. The index lists titles + dates so Claude knows what
+# past learnings exist, and can /recall <keyword> for full content when relevant.
+if [ "$lean_mode" = "0" ]; then
+    project_slug=$(basename "$cwd")
+    memory_root="$HOME/.anchor/memory"
+    has_memory=0
+
+    for category in pitfalls decisions facts; do
+        dir="$memory_root/$category/$project_slug"
+        [ -d "$dir" ] || continue
+        count=$(find "$dir" -maxdepth 1 -name '*.md' 2>/dev/null | wc -l | tr -d ' ')
+        [ "$count" = "0" ] && continue
+        if [ "$has_memory" = "0" ]; then
+            echo ""
+            echo "## Memory index (project: \`$project_slug\`)"
+            echo "_Past learnings for this project. Use \`/recall <keyword>\` for full content._"
+            has_memory=1
+        fi
+        echo ""
+        echo "### ${category} (${count})"
+        # Top 5 most recent: date from filename + first markdown heading
+        find "$dir" -maxdepth 1 -name '*.md' -printf '%T@ %p\n' 2>/dev/null \
+            | sort -nr | head -5 | while read -r _ts f; do
+            date_part=$(basename "$f" .md | grep -oE '^[0-9]{4}-[0-9]{2}-[0-9]{2}' || echo "????-??-??")
+            title=$(grep -m1 '^#' "$f" 2>/dev/null | sed 's/^#\+ *//')
+            [ -z "$title" ] && title=$(basename "$f" .md)
+            echo "- ${date_part} — ${title}"
+        done
+        if [ "$count" -gt 5 ]; then
+            echo "- _(... $((count - 5)) more, ls \`$dir\` for all)_"
+        fi
+    done
+
+    if [ "$has_memory" = "1" ]; then
+        echo ""
+        echo "→ **Auto-recall reflex**: when user mentions a topic that matches an entry above, run \`/recall <topic>\` to load full content BEFORE answering."
+    fi
+fi
+
 if [ "$lean_mode" = "1" ]; then
     echo ""
-    echo "_(lean mode: SessionStart skipped active-task / preferences inject — \`rm ~/.claude/.anchor-lean\` to restore)_"
+    echo "_(lean mode: SessionStart skipped active-task / preferences / memory index — \`rm ~/.claude/.anchor-lean\` to restore)_"
 fi
 
 # Log event

@@ -3,6 +3,65 @@
 All notable changes to **anchor** are tracked here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.0] — 2026-05-21
+
+**Memory actually-gets-remembered release**. User feedback: "主要是能记得住啊 不然记不住没什么用啊" — memory had a write-side (`/pit /decide /remember /snapshot`) but no auto-pull-side. Claude never proactively recalled past learnings — user had to manually `/recall`, defeating the purpose.
+
+### Added — project-scoped memory index in SessionStart
+
+SessionStart hook now lists titles + dates of all `pitfalls / decisions / facts` entries for the current project (matched by `basename(cwd)`). ~30 lines max for typical project. Token-efficient (titles only, not content).
+
+Output example:
+```
+## Memory index (project: `my-api`)
+_Past learnings for this project. Use `/recall <keyword>` for full content._
+
+### pitfalls (4)
+- 2026-04-15 — Redis pipeline cluster slot mismatch
+- 2026-04-22 — JWT expiry edge case
+- 2026-05-01 — Postgres connection pool exhaustion
+- 2026-05-10 — websocket reconnect race
+
+### decisions (2)
+- 2026-03-15 — Use Redis Streams over RabbitMQ for event bus
+- 2026-04-01 — Backfill via dbt incremental, not adhoc SQL
+
+### facts (1)
+- 2026-03-20 — prod DB endpoint + connection limits
+
+→ **Auto-recall reflex**: when user mentions a topic that matches an entry above, run `/recall <topic>` to load full content BEFORE answering.
+```
+
+### Added — SKILL.md "auto-recall reflex" rule (#8)
+
+New core rule:
+
+> "**遇到 topic 先 `/recall`**。SessionStart 注入的 'Memory index' 列出本项目过去 `/pit` `/decide` `/remember` 写过的 topics — 用户提及 matching topic 时，**先 `/recall <topic>` 拉过去经验**再回答，不要凭空答。memory index 是 '有记忆' 信号，`/recall` 拉具体内容。"
+
+This is the actual "remembering" mechanism. Without this rule, memory index would just be context noise. With it, Claude has a clear instruction to use the index as a signal to retrieve past content before answering.
+
+### Behavior
+
+| Without v1.9.0 | With v1.9.0 |
+|---|---|
+| `/pit redis-cluster` writes file | Same write |
+| Next session 1 week later, user asks "redis connection issue" | Same |
+| Claude answers from general knowledge, may miss past insight | Claude sees memory index lists redis-cluster pitfall, runs `/recall redis`, surfaces past insight, answers informed |
+
+### Lean mode behavior
+
+Lean mode (`/lean on`) skips the memory index inject too — saves ~30 lines/session but loses auto-recall reflex. Use only for short Q&A sessions.
+
+### Verified
+
+- 13 regression suites / 299/299 pass.
+- shellcheck PASS.
+- Manual test: created fake pitfall in `~/.anchor/memory/pitfalls/skk/`, SessionStart output correctly listed it under "Memory index".
+
+### Plugin manifest
+
+- Minor 1.8.1 → 1.9.0.
+
 ## [1.8.1] — 2026-05-21
 
 **Token-savings release**. User feedback: "还要省 token". v1.8.0 's SessionStart was injecting active-task.md (60 lines) + preferences.md (30 lines) on every session = ~900 tokens/session overhead. 4 fixes:

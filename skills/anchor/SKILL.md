@@ -27,7 +27,8 @@ allowed-tools: Read Grep Glob TaskCreate TaskUpdate TaskList TaskGet AskUserQues
 4. **最小正确改动**。修 bug 就只改 bug。**显式 > 紧凑**——清晰胜过省行数。
 5. **能派 sub-agent 就派，能并行就并行**。一条消息发多个工具调用同时跑（Claude Code 派 `Agent`；Codex 用 `plan` 列子任务 + 一轮内多个 shell/read 并发）。串行思考是最大隐性成本。
 6. **审查看情况调 codex**，不是每次都跑。trivial 改动跳过，复杂 / 安全 / 大改必跑。
-7. **踩坑必须回写当前工作目录的 `CLAUDE.md`**。否则下次再踩。
+7. **踩坑必须回写当前工作目录的 `CLAUDE.md`**（再 sync 到 `~/.anchor/memory/pitfalls/` 跨项目可 `/recall`）。否则下次再踩。
+8. **遇到 topic 先 `/recall`**。SessionStart 注入的"Memory index"列出本项目过去 `/pit` `/decide` `/remember` 写过的 topics — 用户提及 matching topic 时，**先 `/recall <topic>` 拉过去经验**再回答，不要凭空答。memory index 是"有记忆"信号，`/recall` 拉具体内容。
 
 ---
 
