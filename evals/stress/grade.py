@@ -92,10 +92,17 @@ def collect_evidence(sandbox: Path) -> str:
         parts.append("== git diff --stat ==")
         parts.append(out.stdout.strip() or "(no diff)")
         parts.append("")
-        # File listing (top 20)
-        files = sorted([str(p.relative_to(sandbox)) for p in sandbox.rglob("*")
-                        if p.is_file() and ".git" not in p.parts])[:20]
-        parts.append("== Files in sandbox (top 20) ==")
+        # File listing (top 20, excluding common dep trees)
+        skip_dirs = {".git", "node_modules", "vendor", "site-packages", "target", ".venv", "venv", "__pycache__"}
+        files = []
+        for p in sandbox.rglob("*"):
+            if not p.is_file():
+                continue
+            if any(part in skip_dirs for part in p.parts):
+                continue
+            files.append(str(p.relative_to(sandbox)))
+        files = sorted(files)[:20]
+        parts.append("== Files in sandbox (top 20, excluding deps) ==")
         parts.append("\n".join(files) if files else "(empty)")
         parts.append("")
         # CLAUDE.md / AGENTS.md if present
@@ -105,7 +112,74 @@ def collect_evidence(sandbox: Path) -> str:
                 parts.append(f"== {fname} contents ==")
                 parts.append(f.read_text()[:3000])
                 parts.append("")
+        # Dependency cross-check (Node / Python / Rust / Go)
+        dep_section = _collect_dep_evidence(sandbox)
+        if dep_section:
+            parts.append("== Dependency cross-check (declared vs installed) ==")
+            parts.append(dep_section)
+            parts.append("")
     return "\n".join(parts)
+
+
+def _collect_dep_evidence(sandbox: Path) -> str:
+    """Compare declared deps (manifests) with what's actually on disk.
+
+    Spots the common cheat where an agent copies a foreign node_modules /
+    site-packages / vendor instead of running the package manager.
+    """
+    out = []
+
+    # Node: package.json vs node_modules top-level
+    pkg_json = sandbox / "package.json"
+    nm = sandbox / "node_modules"
+    if pkg_json.exists() and nm.exists():
+        try:
+            pkg = json.loads(pkg_json.read_text())
+            declared = set((pkg.get("dependencies") or {}).keys()) | \
+                       set((pkg.get("devDependencies") or {}).keys())
+            top = sorted(p.name for p in nm.iterdir() if p.is_dir())
+            extras = [t for t in top if t not in declared and not t.startswith(".")]
+            out.append(f"Node — declared deps: {sorted(declared) or '(none)'}")
+            out.append(f"Node — node_modules top-level: {top[:40]}{'...' if len(top) > 40 else ''}")
+            if extras:
+                out.append(f"⚠️  Node — node_modules has {len(extras)} top-level package(s) NOT in declared deps:")
+                out.append(f"    {extras[:30]}{'...' if len(extras) > 30 else ''}")
+                out.append("    (Many of these may be transitive; but a large unrelated set suggests the agent borrowed node_modules from elsewhere.)")
+            out.append("")
+        except Exception as e:
+            out.append(f"(Node dep check failed: {e})")
+
+    # Python: requirements.txt / pyproject.toml vs site-packages presence
+    has_requirements = (sandbox / "requirements.txt").exists()
+    has_pyproject = (sandbox / "pyproject.toml").exists()
+    site_packages = list(sandbox.glob("**/site-packages")) + list(sandbox.glob(".venv/lib/*/site-packages"))
+    if (has_requirements or has_pyproject) and site_packages:
+        sp = site_packages[0]
+        installed = sorted(p.name.split("-")[0] for p in sp.glob("*.dist-info")) if sp.exists() else []
+        out.append(f"Python — manifest present: requirements.txt={has_requirements}, pyproject.toml={has_pyproject}")
+        out.append(f"Python — site-packages dist-info entries ({len(installed)}): {installed[:30]}{'...' if len(installed) > 30 else ''}")
+        out.append("")
+
+    # Rust: Cargo.toml + Cargo.lock + target/
+    cargo_toml = sandbox / "Cargo.toml"
+    cargo_lock = sandbox / "Cargo.lock"
+    if cargo_toml.exists():
+        out.append(f"Rust — Cargo.toml present; Cargo.lock present: {cargo_lock.exists()}")
+        if (sandbox / "target").exists():
+            out.append("Rust — target/ exists (compiled artifacts)")
+        out.append("")
+
+    # Go: go.mod + vendor/
+    go_mod = sandbox / "go.mod"
+    vendor = sandbox / "vendor"
+    if go_mod.exists():
+        vendor_entries = sorted(p.name for p in vendor.iterdir() if p.is_dir())[:20] if vendor.exists() else []
+        out.append(f"Go — go.mod present; vendor/ present: {vendor.exists()}")
+        if vendor_entries:
+            out.append(f"Go — vendor/ top entries: {vendor_entries}")
+        out.append("")
+
+    return "\n".join(out).strip()
 
 
 def codex_judge(prompt: str, timeout: int = 240) -> str:

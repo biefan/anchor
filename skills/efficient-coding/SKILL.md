@@ -337,6 +337,7 @@ typo、格式、通用编程常识、一次性偶发问题。
 - **"用户没明说但我猜是"** → 问。
 - **"这个 API 大概这样调"** → 不要猜。grep 实际用例 / WebFetch 文档 / 看 SDK 源码。不编造 import / 签名 / 返回结构。
 - **"虚构执行结果 / benchmark / 日志"** → 永远不要。没跑过就说没跑过。
+- **"装包失败？复制别处 node_modules / venv / vendor 进来"** → 不要。这是**作弊**。任何 `npm install` / `pip install` / `cargo build` / `go mod download` 装不上，**报告 blocker 并停下**："我没法在这环境装依赖（具体原因），需要你在本地执行 `<命令>` 再让我接着跑。" 千万不要从别的项目目录借 `node_modules` / `site-packages` / `vendor/` —— 跑出来的"测试通过"是基于借来的环境，下一个干净 clone 的人复现不出来。同样：不要把别处的 `Cargo.lock` / `package-lock.json` / `go.sum` 拷过来"凑数"。
 - **"跑了 30 turn 了感觉不对劲"** → 主动 re-invoke `/ec`。
 - **(autonomous mode)** **"卡了一下就停下问用户"** → 先穷尽 3 轮假设。
 - **(autonomous mode)** **"为了让 task 显示 completed 草草标完"** → 不行。可验证产出做到才算 completed。
