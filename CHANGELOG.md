@@ -3,6 +3,74 @@
 All notable changes to **anchor** are tracked here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.3] — 2026-05-21
+
+Fifth-pass audit (codex r5 + self-audit r3 in parallel). Codex r5 explicitly addressed the ROI question and gave an **honest answer**: "ROI down, but not yet academic — 5-7 high-value boundary bugs remain in v1.4.2 wrapper/parser layer". Self-audit r3 found 12 more bypasses, of which 9 overlap with codex r5's "known limits" (control-flow/interpreter -e/script files — fundamentally unsolvable in static analysis) and 3 are wrapper-shaped (ssh / docker exec / kubectl exec) and fixable. Total **10 fixes** this release.
+
+### Fixed — 🔴 Critical
+
+- **G1 heredoc body scan**: `bash <<EOF\\nrm -rf /\\nEOF` previously bypassed the hook because the heredoc body wasn't tokenized — only the `<<<` here-string form was. New `extract_heredocs(cmd_str)` extracts `<<EOF...EOF` / `<<-EOF...EOF` bodies via raw-cmd regex and scans them via the same pipeline. Verified: dangerous heredocs block, safe heredocs (`echo hi`) pass.
+- **G2 flock/script -c shell-string**: v1.4.2 added `flock`/`script` to `WRAPPERS` with `-c` as a generic value flag — the value got skipped instead of re-scanned. Now `strip_env_assignments_and_wrappers` refuses to unwrap `flock` and `script` when `-c`/`--command` is present, leaving them visible to `check_shell_dash_c` (which now also includes them in `SHELLS_WITH_C`).
+
+### Fixed — 🟠 High
+
+- **G3 taskset -c parser**: `taskset -c CPULIST cmd...` had a double-skip bug — `-c VALUE` consumed the value, then the code also tried to skip another positional (assuming `taskset MASK cmd` form), eating the real cmd. Now the parser tracks whether `-c` was used and skips the positional only when it wasn't.
+- **G4 chrt parser**: util-linux `chrt` is actually `chrt [opts] PRIORITY cmd...` (one positional before cmd, not two). The v1.4.2 parser skipped two positionals without `-f`/etc., consuming the real cmd. Fixed to one positional.
+- **F14 ssh remote exec**: `ssh user@host 'rm -rf /'` now blocks. New `check_remote_exec` handles ssh's option schema and recursively scans the post-host shell command string.
+- **F15 docker exec / run**: `docker exec ctr rm -rf /` and `docker run img rm -rf /` now block. Recursively scans the sub-command after container/image with proper docker flag handling.
+- **F16 kubectl exec**: `kubectl exec pod -- rm -rf /` (with `--`) and `kubectl exec pod rm -rf /` (without `--`) both block. Recursively scans the sub-command.
+
+### Fixed — 🟡 Medium
+
+- **G5 parallel multi-token template**: `parallel rm -rf ::: /` (without quotes around the template) had the template span multiple shlex tokens, but the checker only read one. Now collects template tokens until the `:::` / `:::+` / `::::` / `::::+` separator. Same xargs-style protection added: a destructive sub-command (rm/rmdir/shred/mv/dd/mkfs/chown/chmod/cp/etc.) with target-from-stdin always blocks.
+- **G6 stable device-path aliases**: `/dev/disk/by-id/X` / `/dev/disk/by-path/X` / `/dev/disk/by-uuid/X` / `/dev/disk/by-label/X` / `/dev/disk/by-partuuid/X` / `/dev/disk/by-partlabel/X` / `/dev/mapper/X` now match the device-write check alongside `/dev/sd*`/`nvme*`/etc.
+
+### Fixed — 🟢 Low
+
+- **G7 mktemp fail-open**: when `/tmp` is unwritable (read-only fs, full disk, permission denied), v1.4.2 silently let the command through because the bash hook had no `set -e` and `mktemp` failed silently. Now the hook fails closed with an explicit `{"decision":"block","reason":"... /tmp 不可写 ..."}` message.
+
+### Known limits — accepted, documented, not fixed
+
+Codex r5 explicitly listed these as "should not continue treating as bugs":
+
+- **Interpreter `-e`/`-c` content** (`python3 -c "..."`, `perl -e "..."`, `node -e "..."`, `ruby -e "..."`): static shell tokenization can't understand other languages.
+- **Script file content** (`bash ./x.sh`, `source ./env.sh`, `sh /tmp/script.sh`): the file's content is opaque to the static scanner.
+- **Shell control flow** (`for f in /etc; do rm -rf "$f"; done`, `if true; then rm -rf /; fi`, `case x in *) rm -rf / ;; esac`): bash is turing-complete; the destructive payload lives inside a control structure the scanner doesn't walk.
+- **Variable indirection beyond same-line patterns** (`cmd=$(echo rm); $cmd -rf /` — actually partially caught by the obfuscation regex for inline VAR=val+$VAR; longer-distance flows aren't).
+- **Dynamic code generation** (`printf base64-encoded-payload | base64 -d | bash` is caught generically, but anything more elaborate flows past the pipeline-to-shell rule).
+
+For these classes, anchor PreToolUse is explicitly framed as **first defense against instinctive mistakes, NOT a last-resort sandbox against motivated attackers**. The real safety boundary is Claude Code's permission/sandbox model.
+
+### Verified — 90 regression tests across 4 suites
+
+| Suite | Tests | Result |
+|---|---|---|
+| v1.4.0 history (B1-B19) | 32 | 32/32 ✓ |
+| v1.4.1 codex r3 (C1-C11) | 15 | 15/15 ✓ |
+| v1.4.2 codex r4 (E1-E11) | 25 | 25/25 ✓ |
+| v1.4.3 codex r5 + self r3 (G1-G7, F14-F16, regressions) | 18 | 18/18 ✓ |
+
+`shellcheck` PASS on all shell scripts. `jsonlint` PASS. `install.sh` idempotent re-run exit 0.
+
+### Audit history total
+
+- External review (v1.3.6): 10
+- Self-audit (v1.3.7): 5
+- Codex pass 1 (v1.3.8): 15
+- Codex pass 2 (v1.4.0): 19
+- Codex pass 3 (v1.4.1): 19
+- Codex pass 4 (v1.4.2): 20
+- **Codex pass 5 (v1.4.3): 7 + self r3 wrappers: 3 = 10**
+- Cumulative: **98 bugs across 7 audit passes**.
+
+### Methodology validation
+
+Round 5 was the first audit where the bug count *dropped significantly* (from 20 → 10) and where codex explicitly framed itself within ROI limits. That suggests the regex/shlex defense layer is approaching its useful depth — additional rounds can find a few more wrapper-shaped bugs (Anchor's `WRAPPERS` schema is still extensible) but the deep stuff (interpreter -e, control flow, dynamic code) is fundamentally fixable only via OS sandboxing, which is Claude Code's job, not anchor's.
+
+### Plugin manifest
+
+- Versions bumped 1.4.2 → 1.4.3.
+
 ## [1.4.2] — 2026-05-21
 
 Fourth-pass audit. Codex r4 + my own self-audit r2 (running in parallel) found 20 more issues — 15 from codex + 5 from me. Notable: codex r4 found 2 critical PreToolUse target-glob bypasses; my self-audit found 5 syntax-level bypasses (subshells, group commands, here-strings, variable indirection, backslash alias prefix).

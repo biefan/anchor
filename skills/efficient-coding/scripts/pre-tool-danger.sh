@@ -1,5 +1,7 @@
 #!/bin/bash
 # PreToolUse hook: block dangerous Bash commands by ec skill's "高代价动作" rule.
+# v1.4.3: set -e + fail-closed if mktemp can't create marker files
+set -e
 # Returns {"decision":"block","reason":"..."} for explicitly destructive patterns.
 #
 # v1.4.0 redesign (driven by codex adversarial-review pass 2):
@@ -25,8 +27,17 @@
 # shellcheck source=./_log_event.sh
 . "$(dirname "${BASH_SOURCE[0]}")/_log_event.sh"
 
-BLOCK_MARKER="$(mktemp "/tmp/.ec-pretool-block.XXXXXX")"
-INPUT_FILE="$(mktemp "/tmp/.ec-pretool-input.XXXXXX")"
+# G7: fail-closed if /tmp isn't writable — block with explicit reason rather
+# than silently allowing the command through.
+if ! BLOCK_MARKER="$(mktemp "/tmp/.ec-pretool-block.XXXXXX" 2>/dev/null)"; then
+    printf '%s' '{"decision":"block","reason":"ec PreToolUse hook 无法创建 /tmp 标记文件 — fail-closed。请确认 /tmp 可写后重试，或临时禁用 hook。"}'
+    exit 0
+fi
+if ! INPUT_FILE="$(mktemp "/tmp/.ec-pretool-input.XXXXXX" 2>/dev/null)"; then
+    rm -f "$BLOCK_MARKER"
+    printf '%s' '{"decision":"block","reason":"ec PreToolUse hook 无法创建 /tmp 输入文件 — fail-closed。"}'
+    exit 0
+fi
 # shellcheck disable=SC2064
 trap "rm -f $BLOCK_MARKER $INPUT_FILE" EXIT
 
@@ -205,10 +216,16 @@ def strip_env_assignments_and_wrappers(tokens):
         wname = basename(t)
         if wname in WRAPPERS:
             # Special case: env -S "shell string" — `-S` makes env split a
-            # shell-string and execute. Don't unwrap env so check_env_dash_s
-            # can see it.
+            # shell-string and execute. Don't unwrap env so check_env_dash_s sees it.
             if wname == "env" and any(
                 (a == "-S" or a.startswith("-S"))
+                for a in tokens[i + 1:]
+            ):
+                break
+            # G2: flock/script -c "shell string" — same shape as shell -c.
+            # Don't unwrap so check_shell_dash_c sees the wrapper.
+            if wname in ("flock", "script") and any(
+                a == "-c" or a == "--command" or a.startswith("--command=")
                 for a in tokens[i + 1:]
             ):
                 break
@@ -269,9 +286,9 @@ def shlex_split_stages(cmd_str):
     ok). When shlex fails (unbalanced quotes etc.), ok=False signals
     obfuscation.
 
-    Here-strings (<<<): the next token becomes an *additional stage* (so its
-    content gets scanned as inner shell). `sh <<< 'rm -rf /'` thus appears
-    as stages [['sh'], ['rm', '-rf', '/']].
+    v1.4.3: heredoc (`<<EOF`/`<<-EOF`) body is now also extracted via raw cmd
+    pre-processing in scan_heredocs(); this function still handles `<<<` and
+    plain file redirections.
     """
     try:
         tokens = _tokenize_with_punctuation(cmd_str)
@@ -286,8 +303,6 @@ def shlex_split_stages(cmd_str):
             continue
         if here_string_next:
             here_string_next = False
-            # Treat here-string content as an inner stage. Tokenize it
-            # recursively (it's a shell string).
             try:
                 inner_tokens = _tokenize_with_punctuation(t)
                 stages.append(inner_tokens)
@@ -306,6 +321,23 @@ def shlex_split_stages(cmd_str):
             continue
         stages[-1].append(t)
     return [s for s in stages if s], True
+
+
+def extract_heredocs(cmd_str):
+    """G1: Pull `<<EOF...EOF` / `<<-EOF...EOF` heredoc bodies out of the raw cmd
+    so they can be scanned as inner shell.
+
+    Returns list of body strings. The body of `bash <<EOF\\nrm -rf /\\nEOF`
+    is `rm -rf /`.
+    """
+    out = []
+    # Match << or <<- followed by optional quotes + delimiter, then capture
+    # everything until a line equal to the delimiter (possibly indented for <<-).
+    for m in re.finditer(r"<<-?\s*['\"]?(\w+)['\"]?\n(.*?)\n\s*\1\b", cmd_str, re.DOTALL):
+        body = m.group(2).strip()
+        if body:
+            out.append(body)
+    return out
 
 
 def extract_substitutions(s, depth=0):
@@ -541,16 +573,21 @@ def check_disk_ops(argv):
 
 
 def check_redirect_to_device(stage_str):
-    # E11: cover write redirection (>, >>, >|), tee/cp/install destinations,
-    # and modern device naming (sdX, nvme, mmcblk, vd, xvd, etc.)
-    DEV_PAT = r"/dev/(?:sd[a-z]|nvme\d+n\d+|mmcblk\d+|vd[a-z]|xvd[a-z]|hd[a-z]|loop\d+|md\d+|dm-\d+|disk\d+)"
-    # Any kind of write-redirect to a block device
+    # E11+G6: cover write redirection (>, >>, >|), tee/cp/install destinations,
+    # modern device naming, AND Linux stable device aliases
+    # (/dev/disk/by-id/..., /dev/disk/by-path/..., /dev/mapper/...).
+    DEV_PAT = (
+        r"/dev/(?:"
+        r"sd[a-z]|nvme\d+n\d+|mmcblk\d+|vd[a-z]|xvd[a-z]|hd[a-z]"
+        r"|loop\d+|md\d+|dm-\d+|disk\d+"
+        r"|disk/(?:by-id|by-path|by-uuid|by-label|by-partuuid|by-partlabel)/[^\s/]+"
+        r"|mapper/[^\s/]+"
+        r")"
+    )
     if re.search(rf">\|?\s*{DEV_PAT}\b", stage_str):
         return "重定向到块设备会覆盖原始磁盘"
-    # tee writing to device
     if re.search(rf"\btee\s+(?:-[a-z]\s+)*(?:--?\S+\s+)*{DEV_PAT}\b", stage_str):
         return "tee 写入块设备会覆盖原始磁盘"
-    # cp / dd / install / mv writing to device
     if re.search(rf"\b(?:cp|install)\s+[^|;&]*?{DEV_PAT}\b", stage_str):
         return "cp/install 写入块设备会覆盖原始磁盘"
     return None
@@ -654,15 +691,19 @@ def check_xargs(argv):
 
 
 def check_shell_dash_c(argv):
-    """`bash -c "rm -rf /"`, `sh -c ...`, `su -c "..."`, `runuser -c ...`.
+    """`bash -c "rm -rf /"`, `sh -c ...`, `su -c "..."`, `runuser -c ...`,
+    `flock LOCKFILE -c "..."`, `script -q -c "..." /dev/null`, `ssh host "..."`,
+    `docker exec ctr ...`, `kubectl exec pod -- ...`.
 
     Recursively scan the shell command string by re-entering the whole pipeline.
+    Also handles container/remote exec wrappers that pass the next-cmd directly.
     """
     if not argv:
         return None
     cmd0 = basename(argv[0])
     SHELLS_WITH_C = {"sh", "bash", "dash", "ash", "zsh", "ksh", "fish", "tcsh",
-                     "busybox", "su", "doas", "runuser"}
+                     "busybox", "su", "doas", "runuser",
+                     "flock", "script"}
     if cmd0 not in SHELLS_WITH_C:
         return None
     # Find -c flag and its value. Also handle `--command=...` and `-c CMD`.
@@ -767,10 +808,11 @@ def check_watch(argv):
 
 
 def check_parallel(argv):
-    """E9: `parallel 'rm -rf {}' ::: /` — template is a shell command."""
+    """E9/G5: `parallel 'rm -rf {}' ::: /` or `parallel rm -rf ::: /` — template
+    is a shell command. G5 fix: join ALL tokens up to `:::` (not just one).
+    """
     if not argv or basename(argv[0]) != "parallel":
         return None
-    # Find the template: first non-flag, non-value arg before ":::"
     PARALLEL_VALUE_FLAGS = WRAPPER_VALUE_FLAGS.get("parallel", set())
     i = 1
     while i < len(argv):
@@ -784,9 +826,14 @@ def check_parallel(argv):
         break
     if i >= len(argv):
         return None
-    template = argv[i]
-    # Treat template as shell. `{}` placeholder is dynamic input — already
-    # caught by UNKNOWN_TARGETS via the rm checker.
+    # Collect template tokens until `:::` separator.
+    template_toks = []
+    while i < len(argv) and argv[i] not in (":::", ":::+", "::::", "::::+"):
+        template_toks.append(argv[i])
+        i += 1
+    if not template_toks:
+        return None
+    template = " ".join(template_toks)
     sub_stages, ok = shlex_split_stages(template)
     if not ok:
         return "parallel 模板无法 tokenize — obfuscation"
@@ -794,9 +841,119 @@ def check_parallel(argv):
         real = strip_env_assignments_and_wrappers(stage_argv)
         if not real:
             continue
+        cmd0 = basename(real[0])
+        # Same shape as xargs: parallel feeds tokens from `:::` (or stdin via -a)
+        # as additional args. Destructive sub-commands whose explicit argv
+        # shows no target STILL get one at runtime via parallel input.
+        if cmd0 in DESTRUCTIVE_NAMES:
+            return (
+                f"parallel 模板调用破坏性命令 {cmd0!r}（:::/stdin 提供 target，扫描看不到）"
+            )
         msg = scan_argv(real)
         if msg:
             return f"parallel 模板含危险命令: {msg}"
+    return None
+
+
+def check_remote_exec(argv):
+    """F14-F16: ssh / docker exec / kubectl exec — they pass a sub-command
+    that gets executed (locally or remotely). Recursively scan it.
+    """
+    if not argv:
+        return None
+    cmd0 = basename(argv[0])
+    if cmd0 == "ssh":
+        # ssh [opts] HOST [cmd...]
+        # Skip ssh's options. ssh options with values: -p PORT, -i KEY, -o OPT,
+        # -L/-R/-D PORT_SPEC, -F FILE, -E FILE, -l USER, -c CIPHER, -m MAC, -e CHAR.
+        SSH_VALUE_FLAGS = {"-p", "-i", "-o", "-L", "-R", "-D", "-F", "-E", "-l",
+                           "-c", "-m", "-e", "-b", "-B", "-J", "-Q", "-S", "-w"}
+        i = 1
+        while i < len(argv):
+            a = argv[i]
+            if a in SSH_VALUE_FLAGS:
+                i += 2
+                continue
+            if a.startswith("-") and a != "-":
+                i += 1
+                continue
+            break
+        # Now argv[i] should be HOST; argv[i+1:] is the sub-command.
+        if i + 1 < len(argv):
+            sub = argv[i + 1:]
+            if len(sub) == 1:
+                # Single string argument — treat as shell command string.
+                inner = sub[0]
+                sub_stages, ok = shlex_split_stages(inner)
+                if not ok:
+                    return "ssh 远程命令字符串无法 tokenize"
+                for stage_argv in sub_stages or []:
+                    real = strip_env_assignments_and_wrappers(stage_argv)
+                    if not real:
+                        continue
+                    msg = scan_argv(real, sub_check=True)
+                    if msg:
+                        return f"ssh 远程嵌入危险命令: {msg}"
+            else:
+                msg = scan_argv(sub, sub_check=True)
+                if msg:
+                    return f"ssh 远程嵌入危险命令: {msg}"
+        return None
+    if cmd0 == "docker":
+        # docker exec [opts] CONTAINER cmd...
+        # docker run [opts] IMAGE cmd... (similar)
+        if len(argv) >= 2 and argv[1] in ("exec", "run"):
+            DOCKER_VALUE_FLAGS = {"-e", "--env", "-u", "--user", "-w", "--workdir",
+                                  "-v", "--volume", "--name", "--network", "--privileged",
+                                  "-h", "--hostname"}
+            i = 2
+            while i < len(argv):
+                a = argv[i]
+                if a in DOCKER_VALUE_FLAGS:
+                    i += 2
+                    continue
+                if a.startswith("-") and a != "-":
+                    i += 1
+                    continue
+                break
+            # argv[i] is container/image; argv[i+1:] is cmd
+            if i + 1 < len(argv):
+                sub = argv[i + 1:]
+                msg = scan_argv(sub, sub_check=True)
+                if msg:
+                    return f"docker {argv[1]} 嵌入危险命令: {msg}"
+        return None
+    if cmd0 == "kubectl":
+        # kubectl exec [opts] POD [-c CONTAINER] -- cmd...
+        if len(argv) >= 2 and argv[1] in ("exec", "run"):
+            # Find -- separator; everything after is the cmd.
+            if "--" in argv:
+                idx = argv.index("--")
+                if idx + 1 < len(argv):
+                    sub = argv[idx + 1:]
+                    msg = scan_argv(sub, sub_check=True)
+                    if msg:
+                        return f"kubectl {argv[1]} 嵌入危险命令: {msg}"
+            else:
+                # No -- form: skip kubectl flags + pod name, treat rest as cmd
+                KUBECTL_VALUE_FLAGS = {"-c", "--container", "-n", "--namespace",
+                                       "-i", "--stdin", "-t", "--tty"}
+                i = 2
+                while i < len(argv):
+                    a = argv[i]
+                    if a in KUBECTL_VALUE_FLAGS:
+                        i += 2
+                        continue
+                    if a.startswith("-") and a != "-":
+                        i += 1
+                        continue
+                    break
+                if i + 1 < len(argv):
+                    sub = argv[i + 1:]
+                    msg = scan_argv(sub, sub_check=True)
+                    if msg:
+                        return f"kubectl {argv[1]} 嵌入危险命令: {msg}"
+        return None
     return None
 
 
@@ -840,7 +997,7 @@ def scan_argv(argv, sub_check=False):
     argv = strip_env_assignments_and_wrappers(argv)
     if not argv:
         return None
-    for checker in (check_shell_dash_c, check_eval,
+    for checker in (check_shell_dash_c, check_eval, check_remote_exec,
                     check_rm, check_git_reset_hard, check_git_push_force,
                     check_sql_destroy, check_disk_ops,
                     check_find_exec, check_awk_system, check_sed_e, check_xargs):
@@ -865,34 +1022,34 @@ def check_taskset_chrt(argv):
     if cmd0 not in ("taskset", "chrt"):
         return None
     if cmd0 == "taskset":
-        # No -p mode: scan first positional, then sub-cmd.
-        # -c CPULIST? -p PID? Mixed?
+        # G3: taskset modes:
+        #   taskset MASK cmd...     → MASK is positional, cmd follows
+        #   taskset -c CPULIST cmd  → -c takes CPULIST value; cmd follows the value (NO extra positional)
+        #   taskset -p [-c] PID     → no sub-cmd
         i = 1
-        skip_next = False
         has_p = False
+        used_c_flag = False
         while i < len(argv):
             a = argv[i]
-            if skip_next:
-                skip_next = False
-                i += 1
-                continue
             if a in ("-p", "--pid"):
                 has_p = True
                 i += 1
                 continue
             if a in ("-c", "--cpu-list"):
-                skip_next = True
-                i += 1
+                used_c_flag = True
+                i += 2  # -c VALUE
                 continue
             if a.startswith("-") and a != "-":
                 i += 1
                 continue
             break
         if has_p:
-            return None  # taskset -p mode has no sub-cmd
-        # First positional is CPU mask, then cmd.
-        if i + 1 < len(argv):
-            sub = argv[i + 1:]
+            return None
+        # With -c CPULIST consumed: argv[i:] is already the cmd.
+        # Without -c: the first positional is the mask, then cmd.
+        sub_start = i if used_c_flag else i + 1
+        if sub_start < len(argv):
+            sub = argv[sub_start:]
             real = strip_env_assignments_and_wrappers(sub)
             if real:
                 msg = scan_argv(real, sub_check=True)
@@ -901,8 +1058,9 @@ def check_taskset_chrt(argv):
         return None
 
     # chrt
+    # G4: util-linux chrt: `chrt [options] <priority> <command> [args]`.
+    # 即非 -p 模式只有 ONE positional (priority) 在 cmd 前。
     has_p = False
-    has_policy_flag = False
     i = 1
     while i < len(argv):
         a = argv[i]
@@ -911,8 +1069,9 @@ def check_taskset_chrt(argv):
             i += 1
             continue
         if a in ("-f", "-r", "-o", "-b", "-i",
-                 "--fifo", "--rr", "--other", "--batch", "--idle"):
-            has_policy_flag = True
+                 "--fifo", "--rr", "--other", "--batch", "--idle",
+                 "-m", "--max", "-v", "--verbose", "-a", "--all-tasks",
+                 "-R", "--reset-on-fork"):
             i += 1
             continue
         if a.startswith("-") and a != "-":
@@ -921,11 +1080,9 @@ def check_taskset_chrt(argv):
         break
     if has_p:
         return None
-    # Without -p: chrt POLICY PRIO cmd... (2 positionals before cmd)
-    # OR chrt -f PRIO cmd... (1 positional before cmd, policy from flag)
-    skip = 1 if has_policy_flag else 2
-    if i + skip < len(argv):
-        sub = argv[i + skip:]
+    # chrt PRIORITY cmd... — skip ONE positional (priority).
+    if i + 1 < len(argv):
+        sub = argv[i + 1:]
         real = strip_env_assignments_and_wrappers(sub)
         if real:
             msg = scan_argv(real, sub_check=True)
@@ -1042,7 +1199,6 @@ for stage_argv in stages or []:
 for body in extract_substitutions(cmd):
     body_stages, body_ok = shlex_split_stages(body)
     if not body_ok:
-        # Couldn't parse the substitution body — treat as obfuscation.
         emit_block("substitution-parse-failed",
                    "命令替换体无法 tokenize — 可能藏了 obfuscation",
                    body[:120], cmd)
@@ -1054,6 +1210,26 @@ for body in extract_substitutions(cmd):
         if msg:
             emit_block("substitution-body",
                        f"嵌入的子命令含危险操作: {msg}",
+                       " ".join(stage_argv[:6]), cmd)
+
+
+# --------------- G1: Heredoc body scan ---------------
+# `bash <<EOF\nrm -rf /\nEOF` etc. shlex tokenizes the `<<EOF` form weirdly;
+# we operate on the raw cmd string to pull the body out.
+for body in extract_heredocs(cmd):
+    body_stages, body_ok = shlex_split_stages(body)
+    if not body_ok:
+        emit_block("heredoc-parse-failed",
+                   "heredoc 内容无法 tokenize — 可能 obfuscation",
+                   body[:120], cmd)
+    for stage_argv in body_stages or []:
+        real = strip_env_assignments_and_wrappers(stage_argv)
+        if not real:
+            continue
+        msg = scan_argv(real)
+        if msg:
+            emit_block("heredoc-body",
+                       f"heredoc 含危险命令: {msg}",
                        " ".join(stage_argv[:6]), cmd)
 
 sys.exit(0)
