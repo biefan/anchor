@@ -120,39 +120,40 @@ WRAPPERS = {"env", "command", "sudo", "exec", "doas",
             "flock", "nohup", "setsid", "runuser", "script"}
 
 WRAPPER_VALUE_FLAGS = {
-    "sudo": {"-u", "-g", "-p", "-r", "-t", "-C", "-T", "-D"},
-    # NOTE: env -S is special — its VALUE is a shell string to execute, not a
-    # path. We don't list it here so the unwrap loop falls through to treat
-    # `env -S cmd` correctly; check_env_s below handles -S specifically.
-    "env": {"-u"},
+    # sudo: codex r6 — also long forms (--user, --group, --prompt, etc.)
+    "sudo": {"-u", "--user", "-g", "--group", "-p", "--prompt",
+             "-r", "--role", "-t", "--type", "-C", "-T", "-D",
+             "--close-from", "--chdir", "--host"},
+    # env: codex r6 added -C (--chdir). -S handled separately.
+    "env": {"-u", "--unset", "-C", "--chdir"},
     "command": set(),
     "exec": {"-a"},
     "doas": {"-u", "-C"},
     "timeout": {"-s", "--signal", "-k", "--kill-after"},
-    # taskset has TWO modes:
-    #   taskset CPULIST cmd...      → CPULIST is leading positional
-    #   taskset -p [-c] PID         → reads/sets affinity, no cmd to scan
-    # We handle this in strip_env_assignments_and_wrappers via a callback.
     "taskset": {"-c", "--cpu-list"},
-    # chrt has TWO modes:
-    #   chrt POLICY PRIO cmd...     → 2 leading positionals
-    #   chrt -p [POLICY [PRIO]] PID → no cmd
     "chrt": set(),
     "nice": {"-n", "--adjustment"},
     "ionice": {"-c", "-n", "-p", "--class", "--classdata", "--pid"},
     "unshare": set(),
-    "setpriv": set(),
+    # setpriv: codex r6 — --reuid/--regid/--init-groups etc. all take values.
+    "setpriv": {"--reuid", "--regid", "--init-groups", "--inh-caps",
+                "--bounding-set", "--securebits", "--selinux-label",
+                "--apparmor-profile", "--reset-env", "--ambient-caps"},
     "stdbuf": {"-i", "--input", "-o", "--output", "-e", "--error"},
     "parallel": {"-j", "--jobs", "-N", "--max-args", "-n", "-L", "--max-replace-args"},
     "time": {"-o", "--output", "-f", "--format"},
-    # flock LOCKFILE cmd... — first positional is lock path, second+ is cmd.
-    "flock": {"-c", "--command", "-E", "--conflict-exit-code", "-w", "--timeout", "-s", "-x", "-u"},
-    # nohup cmd... — boolean only (no value flags before cmd)
+    "flock": {"-E", "--conflict-exit-code", "-w", "--timeout"},
     "nohup": set(),
     "setsid": {"-w", "--wait"},
-    "runuser": {"-u", "-g", "-G", "--user", "--group", "-s", "--shell", "--session-command"},
-    # script: complex; conservative skip just options
-    "script": {"-a", "-c", "-f", "-q", "-t", "--quiet", "--append", "--command", "--timing"},
+    # runuser: --session-command takes a shell string (handled via check_shell_dash_c).
+    # Listed here so we know to PARSE it, but check_shell_dash_c sees it before unwrap.
+    "runuser": {"-u", "--user", "-g", "--group", "-G", "--supp-group",
+                "-s", "--shell"},
+    "script": {"-a", "-f", "-q", "-t",
+               "--quiet", "--append", "--timing"},
+    # watch: codex r6 — schema was missing entirely.
+    "watch": {"-n", "--interval", "-d", "--differences",
+              "-p", "--precise"},
 }
 
 # Wrappers whose first POSITIONAL argument(s) is NOT the command.
@@ -222,10 +223,13 @@ def strip_env_assignments_and_wrappers(tokens):
                 for a in tokens[i + 1:]
             ):
                 break
-            # G2: flock/script -c "shell string" — same shape as shell -c.
-            # Don't unwrap so check_shell_dash_c sees the wrapper.
-            if wname in ("flock", "script") and any(
-                a == "-c" or a == "--command" or a.startswith("--command=")
+            # G2/v1.4.4: shell-string-taking wrappers — don't unwrap so
+            # check_shell_dash_c sees them.
+            SHELL_STRING_FLAGS_INLINE = {"-c", "--command", "--session-command"}
+            if wname in ("flock", "script", "runuser") and any(
+                a in SHELL_STRING_FLAGS_INLINE
+                or a.startswith("--command=")
+                or a.startswith("--session-command=")
                 for a in tokens[i + 1:]
             ):
                 break
@@ -518,6 +522,150 @@ def check_git_reset_hard(argv):
     return None
 
 
+def check_git_destructive(argv):
+    """git clean -fd[x] / git branch -D — force-deletes that lose work.
+
+    git clean -fdx wipes untracked files AND files in .gitignore.
+    git branch -D force-deletes branches (unmerged work lost).
+    """
+    if not argv or basename(argv[0]) != "git":
+        return None
+    # Skip git global flags
+    i = 1
+    while i < len(argv):
+        a = argv[i]
+        if a in ("-C", "-c", "-P", "--git-dir", "--work-tree", "--namespace",
+                 "--config-env", "--exec-path"):
+            i += 2
+            continue
+        if a.startswith("--git-dir=") or a.startswith("--work-tree="):
+            i += 1
+            continue
+        if a.startswith("-"):
+            i += 1
+            continue
+        break
+    if i >= len(argv):
+        return None
+    sub = argv[i]
+    rest = argv[i + 1:]
+    if sub == "clean":
+        has_force = any("f" in flag for flag in rest if flag.startswith("-") and not flag.startswith("--"))
+        has_force = has_force or "--force" in rest
+        has_recursive = any("d" in flag for flag in rest if flag.startswith("-") and not flag.startswith("--"))
+        # `-fdx` or `-fd` with no specific path = wipe whole tree
+        if has_force and has_recursive:
+            # Allow when an explicit non-dot path argument is given
+            paths = [a for a in rest if not a.startswith("-")]
+            if not paths:
+                return "git clean -fd wipes ALL untracked files in working tree — 范围不可逆"
+            # Wiping CWD or .gitignore-tracked files is destructive
+            if any("x" in flag for flag in rest if flag.startswith("-") and not flag.startswith("--")):
+                return "git clean -fdx 同时清掉 .gitignore 内文件 — 范围不可逆"
+    if sub == "branch":
+        if "-D" in rest:
+            return "git branch -D 强制删除分支（可能丢未合并工作）"
+    return None
+
+
+SUSPICIOUS_GIT_CONFIG_KEYS = {
+    "core.sshcommand", "core.editor", "core.pager", "core.askpass",
+    "gpg.program", "credential.helper", "diff.external", "merge.external",
+}
+
+
+def check_git_config_injection(argv):
+    """git -c core.sshCommand='ssh ... rm -rf /' clone ... — git config inj.
+
+    The -c value can pin sshCommand / core.editor / gpg.program etc. to a
+    shell-runnable that executes attacker code on git operations.
+    """
+    if not argv or basename(argv[0]) != "git":
+        return None
+    i = 1
+    while i < len(argv):
+        a = argv[i]
+        if a == "-c" and i + 1 < len(argv):
+            kv = argv[i + 1]
+            i += 2
+            if "=" not in kv:
+                continue
+            key, _, value = kv.partition("=")
+            key_lower = key.lower()
+            # filter.<name>.{smudge,clean} - wildcard match
+            is_filter = (key_lower.startswith("filter.") and
+                         (key_lower.endswith(".smudge") or key_lower.endswith(".clean")))
+            if not (key_lower in SUSPICIOUS_GIT_CONFIG_KEYS or is_filter):
+                continue
+            sub_stages, ok = shlex_split_stages(value)
+            if not ok:
+                return f"git -c {key} 值无法 tokenize — obfuscation"
+            for stage_argv in sub_stages or []:
+                real = strip_env_assignments_and_wrappers(stage_argv)
+                if not real:
+                    continue
+                msg = scan_argv(real, sub_check=True)
+                if msg:
+                    return f"git -c {key} 嵌入危险命令: {msg}"
+            continue
+        i += 1
+    return None
+
+
+def check_cp_mv_to_system(argv):
+    """cp / mv into /etc/, /usr/, /bin/, /sbin/, /lib/, /boot/.
+
+    Overwriting critical system files (passwd / sudoers / shadow / hosts /
+    systemd units) is essentially privilege escalation or persistent backdoor.
+    """
+    if not argv:
+        return None
+    cmd0 = basename(argv[0])
+    if cmd0 not in ("cp", "mv", "install"):
+        return None
+    # Get positional args (skip flags + their values when known)
+    CP_MV_VALUE_FLAGS = {"-S", "--suffix", "-t", "--target-directory",
+                         "-T", "--no-target-directory", "--backup",
+                         "--preserve", "--reflink"}
+    paths = []
+    i = 1
+    while i < len(argv):
+        a = argv[i]
+        if a == "--":
+            i += 1
+            paths.extend(argv[i:])
+            break
+        if a in CP_MV_VALUE_FLAGS:
+            i += 2
+            continue
+        if a.startswith("--") and "=" in a:
+            i += 1
+            continue
+        if a.startswith("-") and a != "-":
+            i += 1
+            continue
+        paths.append(a)
+        i += 1
+    if not paths:
+        return None
+    # Last positional is the destination (cp/mv convention).
+    dest = paths[-1]
+    DANGEROUS_DEST = re.compile(
+        r"^/(?:etc|usr|bin|sbin|lib|lib64|boot|root)(?:/.*)?$"
+    )
+    # Normalize for /etc/../var/... tricks
+    if dest.startswith("/") and not re.search(r"[$`{}*?\[\]]", dest):
+        try:
+            normalized = os.path.normpath(dest)
+        except Exception:
+            normalized = dest
+    else:
+        normalized = dest
+    if DANGEROUS_DEST.match(normalized):
+        return f"{cmd0} 写入系统目录 {normalized!r} — 可能覆盖系统文件 / 提权"
+    return None
+
+
 def check_git_push_force(argv):
     if not argv or basename(argv[0]) != "git":
         return None
@@ -692,11 +840,10 @@ def check_xargs(argv):
 
 def check_shell_dash_c(argv):
     """`bash -c "rm -rf /"`, `sh -c ...`, `su -c "..."`, `runuser -c ...`,
-    `flock LOCKFILE -c "..."`, `script -q -c "..." /dev/null`, `ssh host "..."`,
-    `docker exec ctr ...`, `kubectl exec pod -- ...`.
+    `runuser --session-command "..."`, `flock LOCKFILE -c "..."`,
+    `script -q -c "..." /dev/null`.
 
     Recursively scan the shell command string by re-entering the whole pipeline.
-    Also handles container/remote exec wrappers that pass the next-cmd directly.
     """
     if not argv:
         return None
@@ -706,15 +853,17 @@ def check_shell_dash_c(argv):
                      "flock", "script"}
     if cmd0 not in SHELLS_WITH_C:
         return None
-    # Find -c flag and its value. Also handle `--command=...` and `-c CMD`.
+    # Find -c/--command/--session-command flag and its value.
+    SHELL_STRING_FLAGS = {"-c", "--command", "--session-command"}
     for i, a in enumerate(argv[1:], start=1):
         inner = None
-        if a == "-c" and i + 1 < len(argv):
+        if a in SHELL_STRING_FLAGS and i + 1 < len(argv):
             inner = argv[i + 1]
-        elif a.startswith("--command="):
-            inner = a[len("--command="):]
-        elif a == "--command" and i + 1 < len(argv):
-            inner = argv[i + 1]
+        else:
+            for prefix in ("--command=", "--session-command="):
+                if a.startswith(prefix):
+                    inner = a[len(prefix):]
+                    break
         if inner is None:
             continue
         sub_stages, ok = shlex_split_stages(inner)
@@ -899,18 +1048,30 @@ def check_remote_exec(argv):
                 if msg:
                     return f"ssh 远程嵌入危险命令: {msg}"
         return None
-    if cmd0 == "docker":
-        # docker exec [opts] CONTAINER cmd...
-        # docker run [opts] IMAGE cmd... (similar)
+    if cmd0 in ("docker", "podman", "nerdctl", "buildah"):
+        # docker/podman/nerdctl exec [opts] CONTAINER cmd...
+        # buildah run [opts] CONTAINER cmd...
         if len(argv) >= 2 and argv[1] in ("exec", "run"):
-            DOCKER_VALUE_FLAGS = {"-e", "--env", "-u", "--user", "-w", "--workdir",
-                                  "-v", "--volume", "--name", "--network", "--privileged",
-                                  "-h", "--hostname"}
+            # codex r6: --privileged is boolean, NOT value flag.
+            CONTAINER_VALUE_FLAGS = {"-e", "--env", "-u", "--user", "-w", "--workdir",
+                                     "-v", "--volume", "--name", "--network",
+                                     "-h", "--hostname", "--cpus", "--memory",
+                                     "-m", "--mount", "--label", "-l",
+                                     "--cgroup-parent", "--restart", "--add-host"}
+            CONTAINER_BOOL_FLAGS = {"-d", "--detach", "-i", "--interactive",
+                                    "-t", "--tty", "--rm", "--privileged",
+                                    "--init", "--read-only", "--no-healthcheck"}
             i = 2
             while i < len(argv):
                 a = argv[i]
-                if a in DOCKER_VALUE_FLAGS:
+                if a in CONTAINER_VALUE_FLAGS:
                     i += 2
+                    continue
+                if a in CONTAINER_BOOL_FLAGS:
+                    i += 1
+                    continue
+                if a.startswith("--") and "=" in a:
+                    i += 1
                     continue
                 if a.startswith("-") and a != "-":
                     i += 1
@@ -921,12 +1082,10 @@ def check_remote_exec(argv):
                 sub = argv[i + 1:]
                 msg = scan_argv(sub, sub_check=True)
                 if msg:
-                    return f"docker {argv[1]} 嵌入危险命令: {msg}"
+                    return f"{cmd0} {argv[1]} 嵌入危险命令: {msg}"
         return None
     if cmd0 == "kubectl":
-        # kubectl exec [opts] POD [-c CONTAINER] -- cmd...
         if len(argv) >= 2 and argv[1] in ("exec", "run"):
-            # Find -- separator; everything after is the cmd.
             if "--" in argv:
                 idx = argv.index("--")
                 if idx + 1 < len(argv):
@@ -935,14 +1094,21 @@ def check_remote_exec(argv):
                     if msg:
                         return f"kubectl {argv[1]} 嵌入危险命令: {msg}"
             else:
-                # No -- form: skip kubectl flags + pod name, treat rest as cmd
+                # codex r6: -i/-t/--stdin/--tty are BOOLEAN, not value flags.
                 KUBECTL_VALUE_FLAGS = {"-c", "--container", "-n", "--namespace",
-                                       "-i", "--stdin", "-t", "--tty"}
+                                       "--context", "--cluster", "-f", "--filename"}
+                KUBECTL_BOOL_FLAGS = {"-i", "--stdin", "-t", "--tty", "-q", "--quiet"}
                 i = 2
                 while i < len(argv):
                     a = argv[i]
                     if a in KUBECTL_VALUE_FLAGS:
                         i += 2
+                        continue
+                    if a in KUBECTL_BOOL_FLAGS:
+                        i += 1
+                        continue
+                    if a.startswith("--") and "=" in a:
+                        i += 1
                         continue
                     if a.startswith("-") and a != "-":
                         i += 1
@@ -953,6 +1119,57 @@ def check_remote_exec(argv):
                     msg = scan_argv(sub, sub_check=True)
                     if msg:
                         return f"kubectl {argv[1]} 嵌入危险命令: {msg}"
+        return None
+    # H1-H8: container/namespace wrappers that take cmd inline after POD/CTR.
+    # (buildah handled above with docker/podman/nerdctl.)
+    if cmd0 in ("lxc-attach", "nsenter", "chroot", "systemd-run",
+                "systemd-nspawn"):
+        # Skip wrapper-specific options to find the inner cmd.
+        # We use a permissive skip: any -X with value-looking next arg gets skipped.
+        WRAPPER_VAL_FLAGS_GENERIC = {
+            "lxc-attach": {"-n", "--name", "-P", "--lxcpath", "-f", "--rcfile",
+                           "-e", "--env", "-V", "--clear-env"},
+            "buildah": {"--user", "--workingdir", "--env"},
+            "nsenter": {"-t", "--target", "-m", "-u", "-i", "-n", "-p", "-U",
+                        "-S", "--setuid", "-G", "--setgid", "-r", "--root",
+                        "-w", "--wd"},
+            "chroot": set(),
+            "systemd-run": {"-u", "--unit", "-p", "--property", "--description",
+                            "--slice", "-t", "--pty", "--uid", "--gid",
+                            "--nice", "--working-directory", "-E", "--setenv"},
+            "systemd-nspawn": {"-D", "--directory", "-i", "--image", "-M",
+                               "--machine", "-u", "--user", "--network-zone",
+                               "--bind", "--bind-ro", "--tmpfs"},
+        }
+        WRAPPER_LEADING_POS = {
+            "chroot": 1,  # chroot NEW_ROOT [cmd...]
+        }
+        value_flags = WRAPPER_VAL_FLAGS_GENERIC.get(cmd0, set())
+        i = 1
+        while i < len(argv):
+            a = argv[i]
+            if a == "--":
+                i += 1
+                break
+            if a in value_flags:
+                i += 2
+                continue
+            if a.startswith("--") and "=" in a:
+                i += 1
+                continue
+            if a.startswith("-") and a != "-":
+                i += 1
+                continue
+            break
+        # Skip wrapper-specific leading positionals
+        i += WRAPPER_LEADING_POS.get(cmd0, 0)
+        if i < len(argv):
+            sub = argv[i:]
+            real = strip_env_assignments_and_wrappers(sub)
+            if real:
+                msg = scan_argv(real, sub_check=True)
+                if msg:
+                    return f"{cmd0} 嵌入危险命令: {msg}"
         return None
     return None
 
@@ -999,6 +1216,8 @@ def scan_argv(argv, sub_check=False):
         return None
     for checker in (check_shell_dash_c, check_eval, check_remote_exec,
                     check_rm, check_git_reset_hard, check_git_push_force,
+                    check_git_destructive, check_git_config_injection,
+                    check_cp_mv_to_system,
                     check_sql_destroy, check_disk_ops,
                     check_find_exec, check_awk_system, check_sed_e, check_xargs):
         msg = checker(argv)

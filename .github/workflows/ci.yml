@@ -81,3 +81,27 @@ jobs:
             fi
           done
           echo "OK: uninstall cleaned up."
+
+  pretool-regression:
+    name: PreToolUse regression (126 cases, 6 suites)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Make scripts executable
+        run: chmod +x evals/regression/test-*.sh evals/regression/test-*.py
+      - name: Run all bash regression suites
+        run: |
+          set -e
+          for f in evals/regression/test-*.sh; do
+            echo "=== $f ==="
+            bash "$f"
+            echo ""
+          done
+      - name: Run all Python regression suites
+        run: |
+          set -e
+          for f in evals/regression/test-*.py; do
+            echo "=== $f ==="
+            python3 "$f"
+            echo ""
+          done

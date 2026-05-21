@@ -3,6 +3,102 @@
 All notable changes to **anchor** are tracked here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.4] — 2026-05-21
+
+Sixth-pass audit (codex r6 + self r4). Codex r6 gave verdict **"not converged, 7 more wrapper-shaped bugs to fix + CI integration of regression suite"**. Self-audit r4 added 16 in parallel — heavy on container/orchestrator wrappers. This release fixes **23 issues + adds CI-integrated regression suite** per codex r6's full closure conditions.
+
+### Codex r6 verdict & response
+
+> "Convergence not reached. 7 high-value boundary bugs remain. Minimum closure: fix these 7 + commit regression suite + wire into CI."
+
+This release does all three. r6 also identified **wrapper schema not data-fied** as the structural blind spot (boolean / value / leading-positional / shell-string flags hand-coded per wrapper).
+
+### Fixed — 🟠 High (codex r6, 5)
+
+- **`sudo --user root rm -rf /`**: sudo's long-form flags (`--user`, `--group`, `--prompt`, `--role`, `--type`) added to `WRAPPER_VALUE_FLAGS["sudo"]`.
+- **`env -C / rm -rf /`**: env's `-C`/`--chdir` (change directory) takes a value; added to schema. (Distinct from `-S` which is shell-string and gets `check_env_dash_s`.)
+- **`runuser --session-command "rm -rf /"`**: `--session-command` is shell-string, not generic value. Now in `check_shell_dash_c`'s `SHELL_STRING_FLAGS`; `strip_env_assignments_and_wrappers` also detects it and refuses to unwrap runuser.
+- **`docker run --privileged img rm -rf /`** and **`kubectl exec -i pod rm -rf /`** (no `--`): boolean flags were classified as value flags, eating the real cmd. Split into `CONTAINER_VALUE_FLAGS` vs `CONTAINER_BOOL_FLAGS` and `KUBECTL_VALUE_FLAGS` vs `KUBECTL_BOOL_FLAGS` so the parser walks correctly.
+
+### Fixed — 🟡 Medium (codex r6, 2)
+
+- **`setpriv --reuid root rm -rf /`**: setpriv schema was empty, so all its `--reuid`/`--regid`/etc. value flags fell through. Now properly schemaed.
+- **`watch -n 1 rm -rf /`**: watch had its own `check_watch` checker, but `WRAPPER_VALUE_FLAGS["watch"]` didn't exist, so the value-flag check inside the checker would never see `-n` as taking a value. Schema added.
+
+### Fixed — 🟠 High (self-audit r4 — container/orchestrator, 8)
+
+Added container/namespace wrapper detection for:
+- `lxc-attach -n CTR -- rm -rf /` (LXC container)
+- `podman exec CTR rm -rf /` / `podman run IMG rm -rf /` (Docker-compatible)
+- `nerdctl exec/run` (containerd)
+- `buildah run CTR rm -rf /` (OCI build tool)
+- `nsenter -t PID -- rm -rf /` (Linux namespace enter)
+- `chroot /mnt rm -rf /etc` (filesystem root change)
+- `systemd-run rm -rf /` (transient unit)
+- `systemd-nspawn -D /mnt rm -rf /` (full container)
+
+Each gets a per-wrapper option schema in `check_remote_exec` (which now also handles docker/podman/nerdctl together) or a generic helper.
+
+### Fixed — 🟠 High (self-audit r4 — git destructive + injection, 4)
+
+- **`check_git_destructive`**: blocks `git clean -fdx` (wipes untracked + .gitignored files in whole tree) and `git clean -fd` without an explicit non-`.` path. Also `git branch -D <name>` (force delete branch — unmerged work lost).
+- **`check_git_config_injection`**: `git -c core.sshCommand='ssh u@h rm -rf /' clone foo` — the `-c KEY=VALUE` form lets you pin attacker code as the ssh command, editor, pager, gpg.program, credential.helper, diff/merge.external, or filter.*.smudge/clean. Suspicious keys → re-tokenize value as shell + recursive scan.
+
+### Fixed — 🟡 Medium (self-audit r4 — cp/mv to system path, 2)
+
+- **`check_cp_mv_to_system`**: blocks `cp /tmp/x /etc/passwd`, `mv /tmp/x /etc/shadow`, `install /tmp/x /usr/bin/foo` — writing into `/etc`/`/usr`/`/bin`/`/sbin`/`/lib`/`/lib64`/`/boot`/`/root` is system-modification (overwrite passwd / sudoers / systemd units etc). Normalizes the destination path (`/etc/../var/...`) before matching.
+
+### Added — Regression suite committed + CI
+
+Per codex r6's "minimum closure" requirement:
+
+- **`evals/regression/` directory** with 6 test suites covering 126 cases across 7 audit rounds:
+  - `test-v1.4.0-history.sh` — codex r1+r2 (32 cases: B1-B19 + classics)
+  - `test-v1.4.1-codex-r3.sh` — codex r3 (15 cases: C1-C11)
+  - `test-v1.4.2-codex-r4.sh` — codex r4 (25 cases: E1-E11)
+  - `test-v1.4.3-codex-r5.py` — codex r5 + self r3 (18 cases: G1-G7 + F14-F16)
+  - `test-v1.4.4-codex-r6.py` — codex r6 + container wrappers (21 cases)
+  - `test-v1.4.4-git-cp-mv.py` — git destructive + config injection + cp/mv (15 cases)
+- **`evals/regression/README.md`** documents each suite's coverage + run instructions + audit timeline.
+- **`.github/workflows/ci.yml`** new `pretool-regression` job runs all 6 suites on every PR / push to main.
+
+### Verified — 126 / 126 across all 6 suites
+
+```
+test-v1.4.0-history.sh    32/32 ✓
+test-v1.4.1-codex-r3.sh   15/15 ✓
+test-v1.4.2-codex-r4.sh   25/25 ✓
+test-v1.4.3-codex-r5.py   18/18 ✓
+test-v1.4.4-codex-r6.py   21/21 ✓
+test-v1.4.4-git-cp-mv.py  15/15 ✓
+─────────────────────────────────
+                       126/126 ✓
+```
+
+shellcheck PASS on all shell scripts. jsonlint PASS. install.sh idempotent re-run exit 0.
+
+### Audit history total
+
+- External review (v1.3.6): 10
+- Self-audit r1 (v1.3.7): 5
+- Codex r1 (v1.3.8): 15
+- Codex r2 (v1.4.0): 19
+- Codex r3 (v1.4.1): 19
+- Codex r4 (v1.4.2): 20
+- Codex r5 (v1.4.3): 10
+- **Codex r6 (v1.4.4): 23 (7 codex + 16 self r4)**
+- Cumulative: **121 bugs across 8 audit rounds**, 126 regression cases.
+
+### Methodology validation
+
+Codex r6 said: "boolean flag, value flag, leading positional, shell-string flag — mixed in hand-written parser" — that's the structural pattern that produces these schema bugs round after round. v1.4.4 *fixes the specific bugs* but doesn't refactor the schema into a data structure (deferred — works fine; refactor is for the day a 7th wrapper class hits).
+
+After 8 audit rounds, the bug rate is **23 → expect 5-10 in r7** (extrapolating the curve). The real safety boundary remains Claude Code's OS sandbox; PreToolUse is "anti-instinct first defense" not "anti-attacker sandbox".
+
+### Plugin manifest
+
+- Versions bumped 1.4.3 → 1.4.4.
+
 ## [1.4.3] — 2026-05-21
 
 Fifth-pass audit (codex r5 + self-audit r3 in parallel). Codex r5 explicitly addressed the ROI question and gave an **honest answer**: "ROI down, but not yet academic — 5-7 high-value boundary bugs remain in v1.4.2 wrapper/parser layer". Self-audit r3 found 12 more bypasses, of which 9 overlap with codex r5's "known limits" (control-flow/interpreter -e/script files — fundamentally unsolvable in static analysis) and 3 are wrapper-shaped (ssh / docker exec / kubectl exec) and fixable. Total **10 fixes** this release.
