@@ -1,0 +1,19 @@
+{
+  "name": "express-sqlite-tasks-api",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Minimal Express and SQLite task management API.",
+  "main": "src/server.js",
+  "scripts": {
+    "migrate": "node src/migrate.js",
+    "start": "node src/server.js",
+    "test": "node --test \"test/**/*.test.js\""
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.4.1",
+    "express": "^5.1.0"
+  }
+}

@@ -1,0 +1,62 @@
+# Express SQLite Tasks API
+
+最小任务管理 API，使用 Express 和 `better-sqlite3`，默认数据库文件为项目根目录的 `db.sqlite`。
+
+## 安装
+
+```bash
+npm install
+```
+
+## 初始化数据库
+
+```bash
+npm run migrate
+```
+
+## 启动服务
+
+```bash
+npm start
+```
+
+默认监听 `http://localhost:3000`，可通过 `PORT` 覆盖端口，通过 `DB_PATH` 覆盖数据库路径。
+
+## 运行测试
+
+```bash
+npm test
+```
+
+## API
+
+### 创建任务
+
+```bash
+curl -X POST http://localhost:3000/tasks \
+  -H 'content-type: application/json' \
+  -d '{"subject":"Write docs","description":"Document the API","status":"pending"}'
+```
+
+### 列出任务
+
+```bash
+curl http://localhost:3000/tasks
+curl 'http://localhost:3000/tasks?status=pending'
+```
+
+### 修改任务状态
+
+```bash
+curl -X PATCH http://localhost:3000/tasks/1 \
+  -H 'content-type: application/json' \
+  -d '{"status":"completed"}'
+```
+
+### 删除任务
+
+```bash
+curl -X DELETE http://localhost:3000/tasks/1
+```
+
+`status` 只允许 `pending`、`in_progress`、`completed`。
