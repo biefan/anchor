@@ -3,6 +3,28 @@
 All notable changes to **anchor** are tracked here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.1] — 2026-05-21
+
+Patch driven by the v1.3.0 demo run (which scored 3 pass / 4 fail). Inspection of the 4 fails showed only 1 was a real agent failure; the other 3 were rubric-design defects. Patched in this release.
+
+### Fixed
+
+- **Stress test #2 spec prompt**: now explicitly says "Commit 分两步：第一个 commit 只含测试 + 通过原始代码的证据；第二个 commit 才含 refactor + 测试仍然通过。" The original prompt didn't ask for this, but the rubric required it — so the v1.3 demo's failure on rubric #1 was on a rule the agent wasn't told. Now prompt and rubric are aligned.
+- **Rubric items across all 3 stress tests**: every item that depends on a particular runtime (pytest installed, Claude Code session vs `codex exec`) now explicitly says "**Mark N/A if ...**" with the exact opt-out condition. Specifically:
+  - Test #1: integration test execution can be N/A when the agent's sandbox couldn't install Node deps (test file existence still counts).
+  - Test #2: "tests pass on original/refactored" items can be N/A when pytest isn't in the grading env; PostToolUse hook item can be N/A under `codex exec`.
+  - Test #3: "all 5 tests pass" can be N/A when pytest isn't available; the judge should rely on the transcript's claimed test output instead.
+- **`grade.py` judge prompt**: distinguishes the three verdict cases more strictly. Pass = positive evidence; Fail = agent demonstrably didn't do something the spec required; N/A = check is unverifiable in this environment or the rubric says "Mark N/A if ...".
+
+### Validated
+
+- Re-graded the v1.3 stress test #2 transcript against the patched spec + judge prompt: **3 pass / 1 fail / 3 N/A** (was 3 / 4 / 0). The single remaining ❌ is now a legitimate signal — commit sequencing — that the v1.3.1 spec prompt would have asked for explicitly. See `evals/results/stress-2-2026-05-21/grading.md` (current) vs `grading-v1.3.0.md` (baseline) and the updated `analysis.md`.
+
+### Other
+
+- `.gitignore` now excludes `__pycache__/` and `*.pyc` (a `grade.cpython-311.pyc` slipped into the v1.3 commit before the gitignore was tightened).
+- Plugin manifests bumped 1.3.0 → 1.3.1; marketplace.json metadata too.
+
 ## [1.3.0] — 2026-05-21
 
 ### Added (Codex-as-judge auto-grading for stress tests — v1.3-E)

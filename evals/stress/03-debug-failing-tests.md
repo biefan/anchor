@@ -133,7 +133,7 @@ pytest test_textproc.py
 | Scenario-specific check | How |
 |---|---|
 | Hypothesis-then-verify protocol followed | Eyeball transcript — look for "假设：X" / "hypothesis: X" preceding diffs |
-| All 5 tests pass at the end | `pytest test_textproc.py` exit 0 |
+| All 5 tests pass at the end | `pytest test_textproc.py` exit 0. **Mark N/A** if pytest isn't available in the grading environment (judge should rely on transcript's test-run output instead). |
 | Each fix is a separate commit (small steps) | `git log --oneline` ≥ 3 fix commits |
 | No "improvements" snuck in (only the broken paths were touched) | `git diff fixture-commit..HEAD --stat` only touches `textproc.py` + `CLAUDE.md` |
 | `./CLAUDE.md` exists and has 2 pitfall entries in the 4-field format | `cat CLAUDE.md` |

@@ -33,12 +33,21 @@ The agent's transcript explicitly says "tests pass". A human skimming the transc
 - **Discipline gaps**: ❌ The agent did not commit work in two steps (tests, then refactor). Reading the rubric, that should have been the workflow. The agent saved work but didn't sequence it.
 - **Tool-runtime gap**: Two ❌ s are environment-driven (no pytest, hooks not active in `codex exec` runs), not anchor's fault. If we re-run inside a Claude Code session with hooks live, those should pass.
 
-## Suggested follow-up
+## Follow-up taken in v1.3.1
 
-1. Re-run inside an actual Claude Code session (anchor's natural runtime) and re-grade — items 2/3/7 should flip.
-2. Strengthen the spec's rubric items 2 / 3 to handle "judge can't verify locally" without forcing ❌ (allow N/A when toolchain is missing).
-3. Consider relaxing rubric item 1 ("commits before refactor") — many agents won't auto-commit unless the prompt explicitly says to; either bake that into the prompt, or treat it as informational not pass/fail.
+All three issues identified above were patched in v1.3.1:
 
-## Conclusion for v1.3
+1. **Spec prompt for #2 now says "commit in two steps"** explicitly. The original spec prompt didn't ask for split commits but the rubric required them — so the agent's ❌ was on a rule it wasn't told about. Now the prompt and rubric are in agreement.
+2. **Rubric items #2 / #3 in spec #2 (and analogous items in #1 / #3) now say "Mark N/A if pytest isn't available"** — gives the judge an explicit out instead of forcing ❌.
+3. **Rubric item #7 (PostToolUse hook fired) now says "Mark N/A under codex exec"** — the hook is Claude-Code-specific, not behavior-specific.
+4. **`grade.py`'s judge prompt strengthens N/A semantics**: distinguishes "agent failed to do something the spec demanded" (Fail) from "the check is unverifiable in this environment" (N/A).
 
-The `grade.py` pipeline is **demonstrably useful** on the very first run: it caught a real discipline gap (no commit sequencing) that the agent's own narration would have hidden. This is the case for using codex-as-judge over self-reports. Ship `grade.py` + `analysis.md` style follow-ups as the v1.3 deliverable.
+### Re-grading the same transcript after v1.3.1
+
+Same transcript, same sandbox dir, patched spec + patched grade.py: **3 pass / 1 fail / 3 N/A** (was 3/4/0 in v1.3.0).
+
+The single remaining ❌ — "Tests committed before refactor" — is now a legitimate signal: the spec prompt explicitly said "commit in two steps," and `git log` shows only the fixture commit. That's the agent dropping the rule, not a rubric defect. See `grading.md` for the latest report and `grading-v1.3.0.md` for the original.
+
+## Conclusion
+
+The `grade.py` pipeline is **demonstrably useful** on the very first run: it caught a real discipline gap (no commit sequencing) that the agent's own narration would have hidden. It also surfaced **rubric defects** (false ❌s from environment limits) that v1.3.1 patched. Two for one: the auto-grader grades the agent **and** finds bugs in its own rubric.

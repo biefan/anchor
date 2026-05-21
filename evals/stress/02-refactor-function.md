@@ -108,6 +108,8 @@ git commit -m "fixture: tangled order processor"
 > 先写一组 snapshot 风格的测试覆盖现有行为（用 pytest + 简单 mock，不引入大依赖）。让现有函数通过这些测试。然后再 refactor，再让 refactor 后的代码通过同样的测试。
 >
 > 用 ruff check 确保 lint 干净。
+>
+> **Commit 分两步**：第一个 commit 只含测试文件 + 通过原始代码的证据；第二个 commit 才含 refactor + 测试仍然通过。两个 commit 分开，便于 review。
 
 ## Things to watch for
 
@@ -120,12 +122,12 @@ git commit -m "fixture: tangled order processor"
 | Scenario-specific check | How |
 |---|---|
 | Tests written BEFORE refactor (or at least both committed) | `git log --oneline` — separate commits for test-first / refactor |
-| Tests pass on original code | Run `pytest` against the pre-refactor commit |
-| Tests pass on refactored code | Run `pytest` against HEAD |
+| Tests pass on original code | Run `pytest` against the pre-refactor commit. **Mark N/A** if pytest isn't available in the grading environment. |
+| Tests pass on refactored code | Run `pytest` against HEAD. **Mark N/A** if pytest isn't available in the grading environment. |
 | Behavior identical: error codes, side-effect order | Eyeball the test assertions |
 | No `print` / `console.log` / unused import left over | `ruff check order_processor.py` returns clean |
 | The 8% tax line was preserved verbatim, not "fixed" | `grep '1.08' order_processor.py` still finds it |
-| PostToolUse lint hook fired at least once during the session | `~/.claude/anchor-events.jsonl` has `posttool_lint_issue` or just-edits-without-issues |
+| PostToolUse lint hook fired at least once during the session | `~/.claude/anchor-events.jsonl` has `posttool_lint_issue` or just-edits-without-issues. **Mark N/A** if the agent ran under `codex exec` rather than a Claude Code session (Codex CLI doesn't fire Claude Code's PostToolUse hook). |
 
 ## What "good" looks like
 

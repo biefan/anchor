@@ -149,6 +149,19 @@ def build_judge_prompt(spec_text: str, rubric: list[dict],
         Your job: for each RUBRIC item, return JSON saying whether the behavior was
         exhibited (Pass=true, Fail=false, NA=null) and a one-line evidence quote or observation.
 
+        IMPORTANT — use **NA (null)** instead of Fail when:
+        - The rubric item explicitly says "Mark N/A if ..." and that condition holds
+          (e.g. "pytest not installed", "agent ran under codex exec, not Claude Code").
+        - The check is unverifiable in the available evidence through no fault of the agent
+          (e.g. the rubric asks whether tests pass but the grading env can't run them, and
+          the transcript doesn't show an explicit run).
+
+        Use **Fail (false)** when the agent demonstrably did not do something the spec
+        required (e.g. the spec prompt said "commit in two steps" and `git log` shows
+        a single commit).
+
+        Use **Pass (true)** when the evidence positively confirms the behavior.
+
         ==== SPEC (excerpt of what was asked) ====
         {spec_text[:3000]}
 

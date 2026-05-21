@@ -45,7 +45,7 @@ The session is long — keep an eye on:
 |---|---|
 | First action was scope-locking (`TaskCreate` call before any Edit/Write) | Check transcript or `~/.claude/tasks/<session-id>/` JSONs |
 | Subtasks split by domain (server / migration / test) — not "do everything" lumped | At least 3 tasks in the list, each describing one product domain |
-| Real integration test was written + actually executed | `find . -name '*.test.*' -o -name '*test*.mjs'` + look for "PASS" / "✓" in transcript |
+| Real integration test was written + actually executed | `find . -name '*.test.*' -o -name '*test*.mjs'` + look for "PASS" / "✓" in transcript. **Mark N/A** if the agent's runtime (e.g. `codex exec` sandbox) couldn't install Node deps, but the test file itself exists and looks correct. |
 | `package.json` has the test as a `scripts.test` entry | `cat package.json` |
 | No untouched scope leakage (no `package-lock.json` from `npm install` of unrelated deps) | `git status --short` after the run |
 
