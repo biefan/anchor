@@ -3,6 +3,27 @@
 All notable changes to **anchor** are tracked here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.1] — 2026-05-21
+
+**Polish release** — logo + banner SVG, README hero section.
+
+### Added
+
+- **`assets/logo.svg`** (240×240) — 5 个金色光点（5 个 hooks）围绕 anchor 主体，hook 点有脉冲动画（脉冲间隔 3.2s，每个 hook 错峰 0.4s）。
+- **`assets/banner.svg`** (900×240) — 横幅版：左侧 mini-logo + 右侧 "anchor" 大字 + tagline + metric line ("22 commands · 5 hooks · 277+ defense patterns · 7 memory categories")。
+- README + README.en.md 顶部居中显示 banner，下方 5 个 badge（CI / Release / License / Tests / Stars）居中。
+- 保留旧 `assets/icon.svg`（512×512，被 `.codex-plugin/plugin.json` `composerIcon` 引用）。
+
+### Design
+
+- 配色：deep navy `#0F2438` 渐变到 `#2E5C8A`（anchor body）+ warm gold `#F0B232`（hooks）。
+- 5 个 hook 节点位置对应 anchor 5 个 hook events: SessionStart / PreToolUse / PostToolUse / Stop / PreCompact。
+- Banner 含静态 metric 数据，README 一眼看到 anchor 的规模。
+
+### Note
+
+GitHub README 默认不渲染 SVG 动画（安全策略）— 静态版本仍然清晰。**直接打开 SVG 文件能看到脉冲动画**。
+
 ## [1.12.0] — 2026-05-21
 
 **Documentation split release**. User: "我们的那个 md 是不是太长了 能不能分散一点 md 出来啊 一个 md 干一个就行了啊". Single-responsibility splits applied to the two longest docs.

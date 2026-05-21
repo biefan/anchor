@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 240" width="900" height="240">
+  <title>anchor — engineering discipline for Claude Code &amp; Codex CLI</title>
+  <defs>
+    <linearGradient id="bg-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0F2438"/>
+      <stop offset="100%" stop-color="#1B3A5F"/>
+    </linearGradient>
+    <linearGradient id="anchor-grad-b" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#5B86B5"/>
+      <stop offset="100%" stop-color="#2E5C8A"/>
+    </linearGradient>
+    <radialGradient id="hook-glow-b">
+      <stop offset="0%" stop-color="#FFD66B" stop-opacity="0.85"/>
+      <stop offset="100%" stop-color="#F0B232" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="900" height="240" fill="url(#bg-grad)"/>
+
+  <!-- Decorative dot grid (subtle) -->
+  <g fill="#5B86B5" opacity="0.07">
+    <circle cx="60" cy="60" r="1.5"/>  <circle cx="120" cy="60" r="1.5"/>
+    <circle cx="60" cy="120" r="1.5"/> <circle cx="120" cy="120" r="1.5"/>
+    <circle cx="60" cy="180" r="1.5"/> <circle cx="120" cy="180" r="1.5"/>
+    <circle cx="780" cy="60" r="1.5"/> <circle cx="840" cy="60" r="1.5"/>
+    <circle cx="780" cy="120" r="1.5"/> <circle cx="840" cy="120" r="1.5"/>
+    <circle cx="780" cy="180" r="1.5"/> <circle cx="840" cy="180" r="1.5"/>
+  </g>
+
+  <!-- Anchor + hooks (mini logo at left) -->
+  <g transform="translate(40,20) scale(0.83)">
+    <!-- glows -->
+    <g>
+      <circle cx="120" cy="22" r="12" fill="url(#hook-glow-b)">
+        <animate attributeName="r" values="12;16;12" dur="3.2s" repeatCount="indefinite"/>
+      </circle>
+      <circle cx="210" cy="80" r="12" fill="url(#hook-glow-b)">
+        <animate attributeName="r" values="12;16;12" dur="3.2s" begin="0.4s" repeatCount="indefinite"/>
+      </circle>
+      <circle cx="210" cy="160" r="12" fill="url(#hook-glow-b)">
+        <animate attributeName="r" values="12;16;12" dur="3.2s" begin="0.8s" repeatCount="indefinite"/>
+      </circle>
+      <circle cx="120" cy="218" r="12" fill="url(#hook-glow-b)">
+        <animate attributeName="r" values="12;16;12" dur="3.2s" begin="1.2s" repeatCount="indefinite"/>
+      </circle>
+      <circle cx="30" cy="80" r="12" fill="url(#hook-glow-b)">
+        <animate attributeName="r" values="12;16;12" dur="3.2s" begin="1.6s" repeatCount="indefinite"/>
+      </circle>
+    </g>
+    <!-- hook nodes -->
+    <g fill="#F0B232" stroke="#C48F12" stroke-width="1.5">
+      <circle cx="120" cy="22" r="6"/>
+      <circle cx="210" cy="80" r="6"/>
+      <circle cx="210" cy="160" r="6"/>
+      <circle cx="120" cy="218" r="6"/>
+      <circle cx="30" cy="80" r="6"/>
+    </g>
+    <!-- connecting dashed -->
+    <g stroke="#F0B232" stroke-width="1.2" stroke-dasharray="3,3" opacity="0.5" fill="none">
+      <line x1="120" y1="29" x2="120" y2="42"/>
+      <line x1="203" y1="80" x2="178" y2="92"/>
+      <line x1="203" y1="160" x2="178" y2="148"/>
+      <line x1="120" y1="211" x2="120" y2="198"/>
+      <line x1="37" y1="80" x2="62" y2="92"/>
+    </g>
+    <!-- anchor -->
+    <g fill="url(#anchor-grad-b)" stroke="#FFFFFF" stroke-width="2" stroke-linejoin="round">
+      <circle cx="120" cy="58" r="13" fill="none" stroke-width="5"/>
+      <rect x="115" y="73" width="10" height="92" rx="2"/>
+      <rect x="82" y="98" width="76" height="9" rx="2"/>
+      <path d="M 120 152 Q 120 178 92 188 L 80 178 Q 105 170 115 155 Z"/>
+      <path d="M 120 152 Q 120 178 148 188 L 160 178 Q 135 170 125 155 Z"/>
+    </g>
+  </g>
+
+  <!-- Wordmark + tagline -->
+  <g font-family="ui-monospace, SF Mono, Menlo, Consolas, Liberation Mono, monospace">
+    <!-- main wordmark -->
+    <text x="290" y="115" font-size="80" font-weight="700" fill="#FFFFFF" letter-spacing="-2">anchor</text>
+    <!-- accent dot (matches hook color) -->
+    <circle cx="555" cy="105" r="9" fill="#F0B232"/>
+
+    <!-- tagline -->
+    <text x="290" y="155" font-size="20" font-weight="400" fill="#A8C5E0">
+      engineering discipline for Claude Code &amp; Codex CLI
+    </text>
+
+    <!-- metrics row -->
+    <g font-size="14" fill="#7FA3C8" font-weight="500">
+      <text x="290" y="190">22 commands</text>
+      <text x="410" y="190">·</text>
+      <text x="425" y="190">5 hooks</text>
+      <text x="495" y="190">·</text>
+      <text x="510" y="190">277+ defense patterns</text>
+      <text x="685" y="190">·</text>
+      <text x="700" y="190">7 memory categories</text>
+    </g>
+
+    <!-- bottom data line -->
+    <g font-size="13" fill="#5B86B5" font-weight="500">
+      <text x="290" y="215">15 suites · 364/364 regression · stress test 13/3/6</text>
+    </g>
+  </g>
+</svg>

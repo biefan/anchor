@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" width="240" height="240">
+  <title>anchor logo</title>
+  <defs>
+    <linearGradient id="anchor-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#2E5C8A"/>
+      <stop offset="100%" stop-color="#0F2438"/>
+    </linearGradient>
+    <radialGradient id="hook-glow">
+      <stop offset="0%" stop-color="#FFD66B" stop-opacity="0.8"/>
+      <stop offset="60%" stop-color="#F0B232" stop-opacity="0.4"/>
+      <stop offset="100%" stop-color="#F0B232" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- 5 hook positions (matching anchor's 5 hooks) -->
+  <!-- glows behind each -->
+  <g>
+    <circle cx="120" cy="22" r="14" fill="url(#hook-glow)">
+      <animate attributeName="r" values="14;18;14" dur="3.2s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="210" cy="80" r="14" fill="url(#hook-glow)">
+      <animate attributeName="r" values="14;18;14" dur="3.2s" begin="0.4s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="210" cy="160" r="14" fill="url(#hook-glow)">
+      <animate attributeName="r" values="14;18;14" dur="3.2s" begin="0.8s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="120" cy="218" r="14" fill="url(#hook-glow)">
+      <animate attributeName="r" values="14;18;14" dur="3.2s" begin="1.2s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="30" cy="80" r="14" fill="url(#hook-glow)">
+      <animate attributeName="r" values="14;18;14" dur="3.2s" begin="1.6s" repeatCount="indefinite"/>
+    </circle>
+  </g>
+
+  <!-- 5 hook nodes -->
+  <g fill="#F0B232" stroke="#C48F12" stroke-width="1.5">
+    <circle cx="120" cy="22" r="7"/>
+    <circle cx="210" cy="80" r="7"/>
+    <circle cx="210" cy="160" r="7"/>
+    <circle cx="120" cy="218" r="7"/>
+    <circle cx="30" cy="80" r="7"/>
+  </g>
+
+  <!-- Connecting dashed lines (the anchor "holds" the 5 hooks together) -->
+  <g stroke="#F0B232" stroke-width="1.2" stroke-dasharray="3,3" opacity="0.45" fill="none">
+    <line x1="120" y1="29" x2="120" y2="42"/>
+    <line x1="203" y1="80" x2="178" y2="92"/>
+    <line x1="203" y1="160" x2="178" y2="148"/>
+    <line x1="120" y1="211" x2="120" y2="198"/>
+    <line x1="37" y1="80" x2="62" y2="92"/>
+  </g>
+
+  <!-- Anchor body -->
+  <g fill="url(#anchor-grad)" stroke="#0F2438" stroke-width="2.5" stroke-linejoin="round">
+    <!-- Top ring -->
+    <circle cx="120" cy="58" r="13" fill="none" stroke-width="6"/>
+    <!-- Shaft -->
+    <rect x="115" y="73" width="10" height="92" rx="2"/>
+    <!-- Cross-bar -->
+    <rect x="82" y="98" width="76" height="9" rx="2"/>
+    <!-- Left fluke (curve down + barb) -->
+    <path d="M 120 152
+             Q 120 178 92 188
+             L 80 178
+             Q 105 170 115 155
+             Z"/>
+    <!-- Right fluke -->
+    <path d="M 120 152
+             Q 120 178 148 188
+             L 160 178
+             Q 135 170 125 155
+             Z"/>
+  </g>
+
+  <!-- Subtle highlight on shaft for depth -->
+  <rect x="116" y="73" width="3" height="92" fill="#5B86B5" opacity="0.45"/>
+</svg>

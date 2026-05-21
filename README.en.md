@@ -1,9 +1,18 @@
-# anchor
+<p align="center">
+  <img src="assets/banner.svg" alt="anchor — engineering discipline for Claude Code &amp; Codex CLI" width="780"/>
+</p>
 
-[![CI](https://github.com/biefan/anchor/actions/workflows/ci.yml/badge.svg)](https://github.com/biefan/anchor/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+<p align="center">
+  <a href="https://github.com/biefan/anchor/actions/workflows/ci.yml"><img src="https://github.com/biefan/anchor/actions/workflows/ci.yml/badge.svg" alt="CI"/></a>
+  <a href="https://github.com/biefan/anchor/releases"><img src="https://img.shields.io/github/v/release/biefan/anchor?sort=semver" alt="Release"/></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"/></a>
+  <a href="evals/regression/"><img src="https://img.shields.io/badge/regression-364%2F364-brightgreen.svg" alt="Tests"/></a>
+  <a href="https://github.com/biefan/anchor/stargazers"><img src="https://img.shields.io/github/stars/biefan/anchor?style=social" alt="Stars"/></a>
+</p>
 
-**English** | [中文](README.md)
+<p align="center">
+  <strong>English</strong> · <a href="README.md">中文</a>
+</p>
 
 > Engineering discipline for Claude Code & Codex CLI: a skill + 22 slash commands + 5 hooks + unified long-term memory (pitfalls / decisions / preferences / snapshots across sessions & projects) that keep AI on-task, prevent drift, and don't stop until the job is done.
 

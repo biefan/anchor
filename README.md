@@ -1,11 +1,18 @@
-# anchor
+<p align="center">
+  <img src="assets/banner.svg" alt="anchor — engineering discipline for Claude Code &amp; Codex CLI" width="780"/>
+</p>
 
-[![CI](https://github.com/biefan/anchor/actions/workflows/ci.yml/badge.svg)](https://github.com/biefan/anchor/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/biefan/anchor?sort=semver)](https://github.com/biefan/anchor/releases)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/regression-364%2F364-brightgreen.svg)](evals/regression/)
+<p align="center">
+  <a href="https://github.com/biefan/anchor/actions/workflows/ci.yml"><img src="https://github.com/biefan/anchor/actions/workflows/ci.yml/badge.svg" alt="CI"/></a>
+  <a href="https://github.com/biefan/anchor/releases"><img src="https://img.shields.io/github/v/release/biefan/anchor?sort=semver" alt="Release"/></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"/></a>
+  <a href="evals/regression/"><img src="https://img.shields.io/badge/regression-364%2F364-brightgreen.svg" alt="Tests"/></a>
+  <a href="https://github.com/biefan/anchor/stargazers"><img src="https://img.shields.io/github/stars/biefan/anchor?style=social" alt="Stars"/></a>
+</p>
 
-[English](README.en.md) | **中文**
+<p align="center">
+  <a href="README.en.md">English</a> · <strong>中文</strong>
+</p>
 
 > **Claude Code / Codex CLI 的工程化纪律包**  
 > 让 AI 写代码"少走错路、不偏题、跑到完为止"，并且**真的记得住**跨 session 跨项目的经验。
