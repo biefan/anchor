@@ -17,6 +17,7 @@ Per-audit-round regression suites for `skills/anchor/scripts/pre-tool-danger.sh`
 | `test-v1.5.1-combo.py` | user-reported round 12 | 15 | 4 combo bypasses (subst-as-cmd / pipe-in-shell-c / nested heredoc / env -S chain) |
 | `test-v1.5.2-admin.py` | defense-scope extension | 90 | 40+ admin/cloud/container destructive cmds + regressions |
 | `test-v1.5.3-fixes.py` | user-reported round 14 | 22 | ln /dev/ + ln false-positive + useradd -G sudo |
+| `test-v1.9-comprehensive.sh` | full feature exercise | 34 | 7 sections: hooks / helpers / memory loop / commands / templates / install / manifests |
 
 **Total**: 172 regression cases across 10 files, 11 audit rounds.
 

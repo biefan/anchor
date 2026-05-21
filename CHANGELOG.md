@@ -3,6 +3,29 @@
 All notable changes to **anchor** are tracked here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.1] — 2026-05-21
+
+**Phase 1 testing** patch — user asked "we just made it, can we test everything?" Wrote a comprehensive end-to-end test suite that exercises every v1.7-v1.9 feature: all 5 hooks, all helper scripts, the memory loop, all 22 commands' file syntax, all 5 templates, install/uninstall idempotency, and plugin manifest consistency.
+
+### Added
+
+- **`evals/regression/test-v1.9-comprehensive.sh`** — 34 test cases across 7 sections:
+  - **A. Hook scripts (8)** — session-start basic / autonomous-detected / lean-mode-acknowledged; stop hook quiet-vs-block; pre-compact warning; pre-tool danger regression; post-tool lint with weird filenames
+  - **B. Helper scripts (3)** — analyze-events.py output; pitfall-sync.py extraction + write
+  - **C. Memory loop (9)** — full write→index→inject→recall cycle: SessionStart memory index lists pitfalls/decisions/facts; lean mode skips; preferences auto-inject conditional on non-empty content
+  - **D. Command syntax (3)** — frontmatter validity; non-empty; count = 22
+  - **E. Templates (1)** — all 5 templates exist + non-empty
+  - **F. Install/uninstall (8)** — install --no-hooks exits 0; creates skill dir; 22 commands installed; templates dir installed; pitfall-sync.py executable; re-run idempotent; uninstall exits 0 + removes
+  - **G. Plugin manifest (2)** — 3 manifests version-consistent; codex-plugin has `interface` block
+
+### Total regression coverage now
+
+14 suites / **333/333 cases** all pass (299 prior + 34 new comprehensive). zero PreToolUse regression. shellcheck PASS on all 11 shell scripts. jsonlint PASS on all manifests.
+
+### Plugin manifest
+
+- Patch 1.9.0 → 1.9.1.
+
 ## [1.9.0] — 2026-05-21
 
 **Memory actually-gets-remembered release**. User feedback: "主要是能记得住啊 不然记不住没什么用啊" — memory had a write-side (`/pit /decide /remember /snapshot`) but no auto-pull-side. Claude never proactively recalled past learnings — user had to manually `/recall`, defeating the purpose.
