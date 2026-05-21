@@ -3,6 +3,44 @@
 All notable changes to **anchor** are tracked here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] — 2026-05-21
+
+**Major rename**: skill identifier `ec` → `anchor` to match the project brand. `/ec` continues to work as a backward-compat alias.
+
+### Why
+
+User asked: "为什么我们现在的插件是显示 ec？" The plugin name (project: `anchor`) and the primary skill name (`ec`) were misaligned.
+
+### Changed
+
+- `SKILL.md` frontmatter `name: ec` → `name: anchor`. Primary entry is `/anchor`.
+- Install paths: `~/.claude/skills/efficient-coding/` → `~/.claude/skills/anchor/` and `~/.codex/skills/ec/` → `~/.codex/skills/anchor/`.
+- Repo internal path: `skills/efficient-coding/` → `skills/anchor/` via `git mv`.
+- 33 files updated to reflect new paths (hook scripts, install/uninstall, settings, regression tests, CI, all 11 commands, docs).
+
+### Added
+
+- `commands/ec.md` — backward-compat alias slash command. `/ec` redirects to the anchor skill (same behavior).
+
+### Migration
+
+`install.sh`'s `ANCHOR_SCRIPT_PAT` regex matches BOTH `efficient-coding/scripts/X.sh` (legacy) and `anchor/scripts/X.sh` (new) for `settings.json` dedup. Re-running `./install.sh` on a v1.4.x machine rewrites old hook paths to new ones. Full clean migration: `./uninstall.sh && ./install.sh`.
+
+### Preserved for backward compat
+
+- `.efficient-coding-autonomous` flag file: documented across multiple READMEs. Existing users who toggled it shouldn't have their state silently broken. Filename stays.
+- `uninstall.sh:145-153` still checks legacy `skills/efficient-coding` dir for cleanup.
+
+### Verified
+
+- 172/172 regression cases pass after path updates.
+- `shellcheck` PASS, `jsonlint` PASS.
+- Live `./install.sh` migration on test machine: settings.json hooks all rewrote to anchor paths.
+
+### Plugin manifest
+
+- Versions bumped 1.4.8 → 1.5.0.
+
 ## [1.4.8] — 2026-05-21
 
 User-reported bypass (round 11).
