@@ -3,6 +3,20 @@
 All notable changes to **anchor** are tracked here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.2] — 2026-05-21
+
+**Logo upgrade** — user provided a sci-fi anchor logo from ChatGPT image gen. Replaced README hero with the new PNG.
+
+### Added
+
+- **`assets/logo.png`** (1024×1024, 825 KB) — full-resolution master image with sci-fi chrome anchor + cyan central orb + energy rays + "ANCHOR" wordmark.
+- **`assets/logo-512.png`** (512×512, 70 KB) — optimized for README hero (12x smaller, same look at typical display size).
+
+### Changed
+
+- `README.md` + `README.en.md` hero: previously a 780-wide custom SVG banner, now a 280-wide centered PNG logo + `<h1>anchor</h1>` + tagline. Cleaner, more polished, lets the new logo do the talking.
+- Kept old SVG assets (`logo.svg`, `banner.svg`, `icon.svg`) — `icon.svg` still referenced by `.codex-plugin/plugin.json` `composerIcon`.
+
 ## [1.12.1] — 2026-05-21
 
 **Polish release** — logo + banner SVG, README hero section.

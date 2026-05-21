@@ -1,5 +1,11 @@
 <p align="center">
-  <img src="assets/banner.svg" alt="anchor — engineering discipline for Claude Code &amp; Codex CLI" width="780"/>
+  <img src="assets/logo-512.png" alt="anchor" width="280"/>
+</p>
+
+<h1 align="center">anchor</h1>
+
+<p align="center">
+  <em>engineering discipline for Claude Code &amp; Codex CLI</em>
 </p>
 
 <p align="center">
