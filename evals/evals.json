@@ -1,64 +1,65 @@
 {
-  "skill_name": "ec",
-  "_comment": "Evaluation prompts for ec skill. Run each prompt with-skill and without-skill, compare. Skill is loaded if available; baseline = same prompt with no skill files installed. See README.md for run instructions.",
+  "skill_name": "anchor (ec)",
+  "_comment": "Behavioral discriminators — runtime-agnostic. Each measures whether the response shows the behavior, not whether a specific tool was called (Claude Code's TaskCreate / AskUserQuestion / Agent etc. don't exist on Codex; using behavior makes the test fair across runtimes).",
   "evals": [
     {
       "id": 1,
       "name": "anti-drift-on-long-task",
       "prompt": "在我的 monorepo 里加一个用户上传头像的功能：前端 React 表单组件、后端 Express POST 接口、数据库 migration。每个改动放在合适的目录（前端 src/web/，后端 src/api/，migration 在 migrations/）。改完跑下集成测试。",
-      "expected_behavior": "Skill 应当：(a) 在动手前用 TaskCreate 锁 scope，至少 5 个子 task；(b) 派 3 个 Explore agent 并行调研三个领域；(c) 实施时不顺手做范围外的事（如优化无关代码、改 logger 等）；(d) E2E 阶段实际跑测试或明说环境跑不动；(e) 全程不偏题。Baseline 容易：直接动手不锁 scope；串行 grep；中途发现 X 顺手改。",
+      "expected_behavior": "Skill 应当：(a) 在动手前明确列出任务分解（task list / plan / 编号步骤都算），至少 4 步；(b) 明确把工作按 3 个领域（前端/后端/migration）分开，不混在一起做；(c) 提到要跑集成测试或问怎么跑（不说'应该可以'就完）；(d) 不顺手做范围外的事（如优化无关代码、改 logger）。",
       "discriminators": [
-        "is_task_list_used",
-        "subagent_count_>= 2",
-        "no_unrelated_changes",
-        "explicit_e2e_step"
+        "explicit_task_breakdown_in_response",
+        "splits_work_by_3_domains_frontend_backend_migration",
+        "mentions_integration_test_step",
+        "no_unrelated_changes_proposed"
       ]
     },
     {
       "id": 2,
       "name": "multi-pass-vuln-scan",
       "prompt": "审一下这个 Flask 应用的安全：app.py 是入口，routes/ 是路由，db/ 是数据库层。请详细告诉我有什么风险。",
-      "expected_behavior": "Skill 应当至少跑 3 遍扫描（模式 grep → 数据流追踪 → 跨文件）+ 推荐 codex 交叉验证；不只跑一遍 npm audit 就说'没问题'；finding 报告含 exploit scenario。",
+      "expected_behavior": "Skill 应当：(a) 提出多遍扫描或分层扫描（模式 → 数据流 → 跨文件 等阶段化）；(b) 提到数据流追踪 / 用户输入到敏感 sink 的概念；(c) 建议或调用 codex review / 第二审视角做交叉验证；(d) 每个 finding 含具体场景（攻击者怎么用），不是抽象漏洞类别名。",
       "discriminators": [
-        "multiple_scan_passes",
-        "data_flow_analysis_mentioned",
-        "codex_review_suggested",
-        "exploit_scenario_per_finding"
+        "proposes_multiple_scan_passes",
+        "mentions_user_input_to_sink_data_flow",
+        "suggests_second_review_or_codex_cross_check",
+        "findings_include_concrete_exploit_scenarios"
       ]
     },
     {
       "id": 3,
       "name": "pitfall-writeback",
       "prompt": "我刚发现一个 bug：Redis pipeline 在 cluster 模式下，跨 slot 的命令被静默丢弃。改了 cache/batch.ts:42 用 hashtag 让 key 落同 slot。这种坑你帮我记录一下。",
-      "expected_behavior": "Skill 应当用 /pit 模板把这条踩坑追加到当前目录的 CLAUDE.md（创建文件如不存在），含现象/根因/修复/教训四要素，不直接在代码加注释。",
+      "expected_behavior": "Skill 应当：(a) 提出写入项目级 CLAUDE.md / AGENTS.md（不只 ~/.codex/memories）；(b) 用结构化记录（含现象/根因/修复/教训 四要素，或类似的可识别结构）；(c) 不建议把记录塞到代码注释；(d) 包含日期或文件位置之一作为可追溯锚点。",
       "discriminators": [
-        "claude_md_created_or_appended",
-        "four_field_structure_used",
-        "no_code_comment_solution",
-        "date_included"
+        "proposes_writing_to_project_claude_md_or_agents_md",
+        "uses_structured_four_field_template",
+        "explicitly_avoids_code_comments",
+        "includes_date_or_file_location_anchor"
       ]
     },
     {
       "id": 4,
       "name": "e2e-not-just-tests",
       "prompt": "我修了 src/api/users.ts 里 GET /api/users/:id 的一个 bug（之前 404 返回了 200）。单测我跑过了都过了。可以了吗？",
-      "expected_behavior": "Skill 应当指出：单测过 ≠ E2E 过；建议起 server 用 curl 真打一次；提示二阶问题（不存在的 user_id、超大 id、SQL 注入等）。Baseline 容易直接说'ok 应该可以了'。",
+      "expected_behavior": "Skill 应当：(a) 明确说'单测过 ≠ 完成'，建议跑一次端到端验证（用 curl / httpie / 实际 HTTP 请求 / 起 server 实验）；(b) 提出二阶问题（不存在的 user_id、并发、authz、超长 id、SQL 注入等至少一项）；(c) 不直接说'可以了 / 应该没问题'就完。",
       "discriminators": [
-        "real_curl_or_http_test_suggested",
-        "second_order_issues_raised",
-        "no_should_be_ok_handwave"
+        "explicitly_says_unit_tests_alone_insufficient",
+        "suggests_real_http_or_curl_test",
+        "raises_at_least_one_second_order_concern",
+        "no_handwave_should_be_ok"
       ]
     },
     {
       "id": 5,
       "name": "intent-clarification",
       "prompt": "帮我改一下登录",
-      "expected_behavior": "Skill 应当先问 1-3 个关键问题（哪种登录、什么症状/期望、影响面），用 AskUserQuestion 给具体选项+推荐项。Baseline 容易直接猜并动手。",
+      "expected_behavior": "Skill 应当：(a) 在动手前问问题（不直接猜怎么改）；(b) 1-3 个问题，覆盖关键决策点（哪个登录、什么症状、什么期望）；(c) 给具体选项让用户回（数字 / a-b-c / 是否问句都算），不是开放式'你能告诉我更多吗'；(d) 不在没回答的情况下提出实现代码。",
       "discriminators": [
-        "asks_question_before_acting",
-        "uses_AskUserQuestion",
-        "1_to_3_focused_questions",
-        "no_premature_implementation"
+        "asks_at_least_one_clarifying_question",
+        "questions_cover_scope_or_symptom_or_expectation",
+        "offers_concrete_options_to_pick_from",
+        "no_implementation_code_before_clarification"
       ]
     }
   ]

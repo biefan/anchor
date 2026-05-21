@@ -22,10 +22,10 @@ allowed-tools: Read Grep Glob TaskCreate TaskUpdate TaskList TaskGet AskUserQues
 ## 核心七条（任何时候被打断都先回这里）
 
 1. **意图清晰才开工**。需求模糊就问，不要二选一兜底硬猜。
-2. **任务范围用 TaskCreate 锁住**。开干前把用户原话当第一条 task 锚住，所有动作只服务 task list 上的项。
+2. **任务范围用任务列表锁住**（Claude Code: `TaskCreate`；Codex: `plan` tool / `update_plan`）。开干前把用户原话当第一条 task 锚住，所有动作只服务 task list 上的项。
 3. **先读项目契约**。`CLAUDE.md` / `AGENTS.md` 是项目宪法。**项目契约 > 用户全局规则 > 本 skill**。
 4. **最小正确改动**。修 bug 就只改 bug。**显式 > 紧凑**——清晰胜过省行数。
-5. **能派 agent 就派，能并行就并行**。一条消息发多个 Agent / Read / Bash 同时跑。串行思考是最大隐性成本。
+5. **能派 sub-agent 就派，能并行就并行**。一条消息发多个工具调用同时跑（Claude Code 派 `Agent`；Codex 用 `plan` 列子任务 + 一轮内多个 shell/read 并发）。串行思考是最大隐性成本。
 6. **审查看情况调 codex**，不是每次都跑。trivial 改动跳过，复杂 / 安全 / 大改必跑。
 7. **踩坑必须回写当前工作目录的 `CLAUDE.md`**。否则下次再踩。
 
@@ -37,7 +37,7 @@ allowed-tools: Read Grep Glob TaskCreate TaskUpdate TaskList TaskGet AskUserQues
 
 ### 锁 scope：开干前 TaskCreate
 
-任何非 trivial 任务**第一件事**用 `TaskCreate` 建任务列表（或用 `/lock <用户原话>`）：
+任何非 trivial 任务**第一件事**用任务列表工具建任务（Claude Code: `TaskCreate`；Codex: `plan` / `update_plan`；或直接用 `/lock <用户原话>`）：
 
 - **第一条 task 抄用户原话**——这是锚点，后面所有动作回头对它。
 - 拆 3-7 个子 task，覆盖完整路径（调研 → 改动 → E2E → 回写 CLAUDE.md）。
@@ -46,7 +46,7 @@ allowed-tools: Read Grep Glob TaskCreate TaskUpdate TaskList TaskGet AskUserQues
 ### 偏题刹车
 
 每完成一个 task：
-1. `TaskUpdate` 标 `completed`。
+1. 标当前 task `completed`（Claude Code: `TaskUpdate`；Codex: `update_plan` 推进状态）。
 2. 看 task list 剩什么——下一步是什么。
 3. **当前想做的事不在 task list 上**——停。要么加成新 task 等用户确认，要么放弃。
 
@@ -119,7 +119,7 @@ allowed-tools: Read Grep Glob TaskCreate TaskUpdate TaskList TaskGet AskUserQues
 - **关键决策**："加搜索" → 后端搜索 vs 前端过滤？模糊 vs 精确？分页？
 - **影响面**："优化性能" → 哪个指标？接受什么取舍？
 
-问的时候：1-3 个**最关键**问题；用 `AskUserQuestion` 给具体选项；标 `(Recommended)`。
+问的时候：1-3 个**最关键**问题；给具体选项让用户选（Claude Code: `AskUserQuestion`；Codex: 编号 1/2/3/4 让用户回数字）；标 `(Recommended)`。
 
 不用问：已经具体到文件/函数/行号，或明显 trivial。
 
@@ -147,9 +147,9 @@ allowed-tools: Read Grep Glob TaskCreate TaskUpdate TaskList TaskGet AskUserQues
 
 | 场景 | 派谁 | 单独/并行 |
 |---|---|---|
-| 广泛搜索（>3 次 grep 才覆盖） | `Explore` | 单独 |
-| 多步实现需先做架构方案 | `Plan` | 单独 |
-| 独立多路调研（前端/后端/infra） | 多个 `Explore` | **并行** |
+| 广泛搜索（>3 次 grep 才覆盖） | 探索型子代理（Claude Code: `Explore` agent；Codex: `plan` 列搜索步 + 多 shell 并发） | 单独 |
+| 多步实现需先做架构方案 | 规划型（Claude Code: `Plan` agent；Codex: `plan` tool 先输出方案） | 单独 |
+| 独立多路调研（前端/后端/infra） | 多路并发（Claude Code: 多 `Explore`；Codex: 一个 plan 多个并发分支） | **并行** |
 | 多个独立子任务（功能 A / bug B / 调研 C） | 对应 agent | **并行** |
 | 主线写代码 + 副线调研/扫漏洞/build | 主线自做 + 副线 agent 后台 | **并行** |
 | 长跑任务（CI / 大查询 / build / install） | `Bash` background | **并行** |

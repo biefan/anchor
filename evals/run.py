@@ -30,14 +30,24 @@ from pathlib import Path
 SCRIPT_DIR = Path(__file__).resolve().parent
 EVALS_FILE = SCRIPT_DIR / "evals.json"
 CODEX_SKILLS = Path.home() / ".codex" / "skills"
+CODEX_AGENTS_MD = Path.home() / ".codex" / "AGENTS.md"
 SKILLS_TO_HIDE = ["ec", "lock", "pit", "scan", "done", "next", "recap", "init-claude-md"]
 
 
-def codex_exec(prompt, timeout=240):
-    """Run codex exec --json, return concatenated assistant text."""
+def codex_exec(prompt, timeout=240, cwd=None, sandbox="workspace-write"):
+    """Run codex exec --json, return concatenated assistant text.
+
+    cwd: working directory for codex (it will write files relative to here)
+    sandbox: read-only | workspace-write | danger-full-access
+    """
+    cmd = ["codex", "exec", "--json", "--skip-git-repo-check"]
+    if sandbox:
+        cmd += ["--sandbox", sandbox]
+    cmd.append(prompt)
     try:
         proc = subprocess.run(
-            ["codex", "exec", "--json", "--skip-git-repo-check", prompt],
+            cmd,
+            cwd=cwd,
             capture_output=True, text=True, timeout=timeout,
         )
     except subprocess.TimeoutExpired:
@@ -84,6 +94,23 @@ def restore_skills(backup, moved):
         pass
 
 
+def hide_agents_md():
+    """Temporarily mv ~/.codex/AGENTS.md to /tmp so the baseline is bare codex."""
+    if not CODEX_AGENTS_MD.exists():
+        return None
+    backup = Path(f"/tmp/anchor-agents-md-hidden-{int(time.time())}.md")
+    shutil.move(str(CODEX_AGENTS_MD), str(backup))
+    return backup
+
+
+def restore_agents_md(backup):
+    if backup is None:
+        return
+    if CODEX_AGENTS_MD.exists():
+        CODEX_AGENTS_MD.unlink()
+    shutil.move(str(backup), str(CODEX_AGENTS_MD))
+
+
 def judge(prompt, output, discriminators):
     """Have codex judge whether each discriminator was triggered."""
     out_snippet = output[:4000]
@@ -120,28 +147,42 @@ Output ONLY the JSON object below, no prose:
         return {"error": f"json parse failed: {e}", "raw": text[:500]}
 
 
-def run_one_eval(eval_obj, results_dir):
+def run_one_eval(eval_obj, results_dir, sandbox="workspace-write"):
     eid = eval_obj["id"]
     name = eval_obj["name"]
     prompt = eval_obj["prompt"]
     discriminators = eval_obj["discriminators"]
 
+    # Each eval runs in its own sandbox dir so codex can write files (CLAUDE.md etc.)
+    # without polluting the repo or interfering with the other run.
+    sandbox_with = results_dir / f"sandbox-eval{eid}-with"
+    sandbox_with.mkdir(exist_ok=True)
+    sandbox_wo = results_dir / f"sandbox-eval{eid}-without"
+    sandbox_wo.mkdir(exist_ok=True)
+
     print(f"\n[#{eid} {name}]", flush=True)
 
     print("  with-skill: running codex exec...", flush=True)
-    text_w, _, _ = codex_exec(prompt)
+    text_w, _, _ = codex_exec(prompt, cwd=str(sandbox_with), sandbox=sandbox)
     (results_dir / f"eval{eid}-with-output.txt").write_text(text_w)
     print(f"    got {len(text_w)} chars", flush=True)
 
     print("  hiding skills + without-skill: running...", flush=True)
     backup, moved = hide_skills()
     try:
-        text_wo, _, _ = codex_exec(prompt)
+        text_wo, _, _ = codex_exec(prompt, cwd=str(sandbox_wo), sandbox=sandbox)
         (results_dir / f"eval{eid}-without-output.txt").write_text(text_wo)
         print(f"    got {len(text_wo)} chars", flush=True)
     finally:
         restore_skills(backup, moved)
         print("  skills restored", flush=True)
+
+    # Capture any files codex created in the sandbox dirs (e.g. CLAUDE.md)
+    for label, sb in [("with", sandbox_with), ("without", sandbox_wo)]:
+        files = sorted(p for p in sb.rglob("*") if p.is_file())
+        if files:
+            manifest = results_dir / f"eval{eid}-{label}-files.txt"
+            manifest.write_text("\n".join(str(p.relative_to(sb)) for p in files))
 
     print("  judging with-skill...", flush=True)
     j_w = judge(prompt, text_w, discriminators)
@@ -210,6 +251,11 @@ def main():
     p.add_argument("--eval-id", type=int, help="Run only this eval ID")
     p.add_argument("--limit", type=int, help="Run only first N evals")
     p.add_argument("--all", action="store_true", help="Run all evals")
+    p.add_argument("--sandbox", default="workspace-write",
+                   choices=["read-only", "workspace-write", "danger-full-access"],
+                   help="codex sandbox mode (default workspace-write so codex can create CLAUDE.md etc.)")
+    p.add_argument("--no-baseline", action="store_true",
+                   help="Temporarily mv ~/.codex/AGENTS.md aside so the baseline is bare codex (measure pure anchor delta)")
     args = p.parse_args()
 
     evals = json.loads(EVALS_FILE.read_text())["evals"]
@@ -221,19 +267,28 @@ def main():
         p.error("Specify --eval-id N, --limit N, or --all")
 
     ts = time.strftime("%Y%m%d-%H%M%S")
-    results_dir = SCRIPT_DIR / "results" / ts
+    suffix = "-no-baseline" if args.no_baseline else ""
+    results_dir = SCRIPT_DIR / "results" / f"{ts}{suffix}"
     results_dir.mkdir(parents=True, exist_ok=True)
-    print(f"Running {len(evals)} eval(s) → {results_dir}", flush=True)
+    mode_note = f"sandbox={args.sandbox}, baseline_agents_md={'hidden' if args.no_baseline else 'present'}"
+    print(f"Running {len(evals)} eval(s) → {results_dir}\n  ({mode_note})", flush=True)
+
+    agents_backup = hide_agents_md() if args.no_baseline else None
 
     summaries = []
-    for e in evals:
-        try:
-            summaries.append(run_one_eval(e, results_dir))
-        except KeyboardInterrupt:
-            print("\nAborted by user", file=sys.stderr)
-            break
-        except Exception as exc:
-            print(f"  ! eval {e['id']} failed: {exc}", file=sys.stderr)
+    try:
+        for e in evals:
+            try:
+                summaries.append(run_one_eval(e, results_dir, sandbox=args.sandbox))
+            except KeyboardInterrupt:
+                print("\nAborted by user", file=sys.stderr)
+                break
+            except Exception as exc:
+                print(f"  ! eval {e['id']} failed: {exc}", file=sys.stderr)
+    finally:
+        if args.no_baseline:
+            restore_agents_md(agents_backup)
+            print("AGENTS.md restored", flush=True)
 
     if summaries:
         report = render_report(summaries, results_dir)
