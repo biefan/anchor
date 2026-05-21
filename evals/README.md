@@ -33,18 +33,38 @@
 
 记录差异。
 
-## 自动化跑法（subagent 批量）
+## 自动化跑法（推荐）：`run.py`
 
-如果你有 Claude Code 的子代理能力，可以让一个 agent 批量跑所有 5 个 prompt：
+仓库自带一个批量 runner，用 `codex exec --json` 跑每个 prompt 两遍 + 让 codex 自己当 LLM judge 评每个 discriminator：
 
+```bash
+# 跑全部 5 个 eval（~20-25 min；每个 ~5 min）
+python3 evals/run.py --all
+
+# 只跑一个
+python3 evals/run.py --eval-id 1
+
+# 跑前 N 个
+python3 evals/run.py --limit 2
 ```
-for each eval in evals.json:
-  spawn Agent with the prompt
-  collect: transcript, files-changed, did-task-list-exist, etc.
-  score each discriminator
-```
 
-完整 eval-viewer 流程参考 Anthropic skill-creator 的 `eval-viewer/generate_review.py`：
+工作流：
+1. 用 `codex exec` 跑 prompt（当前 `~/.codex/skills/` 里的 anchor 是 active 的）
+2. 把 `~/.codex/skills/{ec,lock,pit,scan,done,next,recap,init-claude-md}/` 临时 mv 到 `/tmp/anchor-skills-hidden-<ts>/`
+3. 用同样 prompt 跑一遍（这次没有 anchor）
+4. 恢复 skill 目录
+5. 起两个 `codex exec` 当 judge，针对每个 output 评每个 discriminator（输出 JSON `{triggered, evidence}`）
+6. 拼 markdown 报告到 `evals/results/<ts>/report.md`
+
+每个 eval 产出 4 个文件：
+- `eval<N>-with-output.txt` — with-skill 的回答
+- `eval<N>-without-output.txt` — without-skill 的回答
+- `eval<N>-summary.json` — 双 judge 评分
+- `report.md` — 全局摘要 + per-eval 详情
+
+**前置**：`codex` 在 PATH 里 + 已用 `./install.sh` 把 anchor 装到 `~/.codex/skills/`。
+
+完整 eval-viewer 流程也可以参考 Anthropic skill-creator 的 `eval-viewer/generate_review.py`：
 - 见 `/root/.claude/plugins/marketplaces/anthropic-agent-skills/skills/skill-creator/`
 
 ## Discriminator 的含义
