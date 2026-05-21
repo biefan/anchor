@@ -1,3 +1,8 @@
+# Eval sandbox directories — codex writes random project files here during runs;
+# they're informative locally but shouldn't be tracked in the repo.
+# (The eval output .txt and summary .json files in results/<ts>/ are still tracked.)
+evals/results/*/sandbox-*/
+
 # Editors
 .vscode/
 .idea/
