@@ -242,7 +242,7 @@ if command -v codex >/dev/null 2>&1 && [ -d "$CODEX_DIR" ]; then
     cp "$SCRIPT_DIR/skills/anchor/scripts/"*.sh "$CODEX_DIR/skills/anchor/scripts/"
     cp "$SCRIPT_DIR/skills/anchor/scripts/"*.py "$CODEX_DIR/skills/anchor/scripts/"
     chmod +x "$CODEX_DIR/skills/anchor/scripts/"*.sh "$CODEX_DIR/skills/anchor/scripts/"*.py
-    for cmd in lock pit scan "done" next recap init-claude-md status ship diff cleanup ec cost report save resume milestone recall; do
+    for cmd in lock pit scan "done" next recap init-claude-md status ship diff cleanup ec cost report save resume milestone recall remember decide snapshot; do
         mkdir -p "$CODEX_DIR/skills/$cmd"
         cp "$SCRIPT_DIR/commands/$cmd.md" "$CODEX_DIR/skills/$cmd/SKILL.md"
     done

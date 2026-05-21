@@ -79,6 +79,21 @@ if [ -f "$HOME/.anchor/active-task.md" ]; then
     echo "→ If unrelated, /lock new scope (anchor will clear/reset active-task on /milestone or /done)."
 fi
 
+# v1.8.0: inject user preferences if present (long-term memory across sessions/projects).
+if [ -f "$HOME/.anchor/memory/preferences.md" ]; then
+    echo ""
+    echo "## User preferences (from \`~/.anchor/memory/preferences.md\`)"
+    echo ""
+    # Cap at 30 lines — preferences should be terse
+    head -30 "$HOME/.anchor/memory/preferences.md"
+    pref_lines=$(wc -l < "$HOME/.anchor/memory/preferences.md")
+    if [ "$pref_lines" -gt 30 ]; then
+        echo "_(... $pref_lines lines total)_"
+    fi
+    echo ""
+    echo "→ Apply these throughout the session unless user says otherwise."
+fi
+
 # Log event
 EC_LOG_event="session_start" \
 EC_LOG_cwd="$cwd" \

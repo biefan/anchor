@@ -5,7 +5,7 @@
 
 [English](README.en.md) | **中文**
 
-> Claude Code / Codex CLI 的工程化纪律：skill + 18 个 slash commands + 5 个 hooks (含跨项目记忆 + 长任务多会话续接)，让 AI 写代码"少走错路、不偏题、跑到完为止"。
+> Claude Code / Codex CLI 的工程化纪律：skill + 21 个 slash commands + 5 个 hooks + 统一长期记忆系统（pitfalls / decisions / preferences / snapshots 跨 session 跨项目），让 AI 写代码"少走错路、不偏题、跑到完为止"。
 
 ## 实测战报（v1.4.6 跑过 3 个真实场景）
 

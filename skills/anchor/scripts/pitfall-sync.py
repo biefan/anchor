@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
-"""Sync the most-recent pitfall entry from ./CLAUDE.md to ~/.anchor/pitfalls/.
+"""Sync the most-recent pitfall entry from ./CLAUDE.md to ~/.anchor/memory/pitfalls/.
 
 Run after /pit appends a new entry. Extracts the top-most entry under the
 踩坑记录 / Known Pitfalls / Lessons Learned section and writes it to
-~/.anchor/pitfalls/<project-slug>/<YYYY-MM-DD>-<short-slug>.md for later
+~/.anchor/memory/pitfalls/<project-slug>/<YYYY-MM-DD>-<short-slug>.md for later
 cross-project search via /recall.
+
+v1.8.0: path moved from ~/.anchor/pitfalls/ to ~/.anchor/memory/pitfalls/ as
+part of the unified memory tree (alongside decisions / facts / snapshots).
 
 Idempotent: if the same entry is already synced (matched by title), skip.
 """
@@ -108,7 +111,15 @@ def main():
     if not entry:
         print("pitfall-sync: no pitfall section / entry found in CLAUDE.md", file=sys.stderr)
         sys.exit(0)
-    target_dir = Path.home() / ".anchor" / "pitfalls" / slugify(args.project, 80)
+    target_dir = Path.home() / ".anchor" / "memory" / "pitfalls" / slugify(args.project, 80)
+    # Backward compat: if old ~/.anchor/pitfalls/<project>/ exists, migrate.
+    legacy_dir = Path.home() / ".anchor" / "pitfalls" / slugify(args.project, 80)
+    if legacy_dir.is_dir() and not target_dir.exists():
+        target_dir.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            legacy_dir.rename(target_dir)
+        except OSError:
+            pass  # fall through; new entries go to new path regardless
     if already_synced(target_dir, entry["title"]):
         print(f"pitfall-sync: '{entry['title']}' already synced (skip)", file=sys.stderr)
         sys.exit(0)

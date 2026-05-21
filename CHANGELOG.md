@@ -3,6 +3,83 @@
 All notable changes to **anchor** are tracked here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.0] — 2026-05-21
+
+**Feature release**: unified long-term memory system. v1.7.0 added pitfalls-only cross-project index; v1.8.0 generalizes it to a 7-category memory tree (`~/.anchor/memory/`) + 3 new commands to write into it + upgraded `/recall` to search all of them.
+
+### Added — 3 new memory-write commands
+
+- **`/remember <category> <content>`** — generic long-term memory write:
+  - `pref` → `~/.anchor/memory/preferences.md` (single file, auto-injected by SessionStart hook)
+  - `decision` → `~/.anchor/memory/decisions/<project>/<file>.md`
+  - `fact` → `~/.anchor/memory/facts/<project>/<file>.md`
+  - `todo` → `~/.anchor/memory/todos.md` (single file)
+- **`/decide <title>`** — ADR-style architectural decision record. Auto-extracts context / alternatives / consequences from chat history. Writes to `~/.anchor/memory/decisions/<project>/<YYYY-MM-DD>-<slug>.md` with full ADR structure (Status / Context / Decision / Alternatives / Consequences / Followup).
+- **`/snapshot <label>`** — full workspace snapshot (more than `/save`): task list + git state (branch/diff-stat/log) + active-task.md + modified file contents (top 20) + manifest. Use for long-task major checkpoints or pre-experiment safety. Writes to `~/.anchor/memory/snapshots/<project>/<label>-<timestamp>/`.
+
+### Changed — `/recall` upgraded to multi-category
+
+Now searches all 7 memory locations in parallel:
+
+```
+~/.anchor/memory/pitfalls/<project>/      (from /pit)
+~/.anchor/memory/decisions/<project>/     (from /decide)
+~/.anchor/memory/facts/<project>/         (from /remember fact)
+~/.anchor/memory/preferences.md           (from /remember pref)
+~/.anchor/memory/todos.md                 (from /remember todo)
+~/.anchor/memory/snapshots/<project>/     (from /snapshot)
+~/.anchor/saved-tasks/                    (from /save)
+~/.anchor/active-task.md                  (current long-task state)
+```
+
+Output groups results by category with emoji headers (📌 Pitfalls / 🏛 Decisions / 📋 Facts / ⚙️ Preferences / ✅ TODOs / 📸 Snapshots / 💾 Saved tasks). Optional filters: `--category=X`, `--project=X`, `--since=YYYY-MM`.
+
+### Changed — SessionStart hook auto-injects preferences
+
+`session-start-inject.sh` now reads `~/.anchor/memory/preferences.md` (if exists) and injects the first 30 lines into session context. After a single `/remember pref "我用 pnpm 不是 npm"`, every future session automatically gets that context — no need to re-tell Claude.
+
+### Changed — pitfall path migration
+
+- `pitfall-sync.py` writes to `~/.anchor/memory/pitfalls/<project>/` (v1.8.0 location).
+- Backward-compat: if `~/.anchor/pitfalls/<project>/` (v1.7.0 location) exists, auto-migrates on next `/pit` run via `os.rename`. Zero data loss.
+- `recall.md` searches both old and new paths during transition.
+
+### Memory tree summary
+
+```
+~/.anchor/
+├── memory/
+│   ├── pitfalls/<project>/<file>.md    (v1.7 → v1.8 migrated)
+│   ├── decisions/<project>/<file>.md   (NEW)
+│   ├── facts/<project>/<file>.md       (NEW)
+│   ├── snapshots/<project>/<file>/     (NEW)
+│   ├── preferences.md                  (NEW, SessionStart auto-injected)
+│   └── todos.md                        (NEW)
+├── saved-tasks/<label>.md              (v1.6.0)
+└── active-task.md                      (v1.7.0)
+```
+
+### Verified
+
+- 13 regression suites / 299/299 pass (zero PreToolUse regression).
+- `shellcheck` PASS on all 10 shell scripts.
+- `jsonlint` PASS on all manifests.
+- Live install: 21 commands + 9 scripts + 5 hooks all wired. Memory dir structure auto-created on first `/remember` / `/decide` / `/snapshot` / `/pit` invocation.
+
+### Total surface (v1.0 → v1.8.0)
+
+- **Slash commands**: 21 (was 18, +remember/decide/snapshot)
+- **Hooks**: 5 (SessionStart / Stop / PreToolUse / PostToolUse / PreCompact)
+- **Scripts**: 9 (in skills/anchor/scripts/)
+- **References**: 5 (autonomous-mode / multi-agent-recipes / pitfall-template / vuln-checklist / multi-cli-adapters)
+- **Templates**: 5 (web-app / library / cli-tool / data-pipeline / default)
+- **Regression suites**: 13 / 299 cases
+- **Memory categories**: 7 (pitfalls / decisions / facts / preferences / todos / snapshots / saved-tasks)
+
+### Plugin manifest
+
+- Minor bump 1.7.0 → 1.8.0.
+
 ## [1.7.0] — 2026-05-21
 
 **Feature release**: long-task continuity + cross-project memory system. Closes the two remaining UX gaps for multi-day / multi-session work.
