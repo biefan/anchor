@@ -3,6 +3,56 @@
 All notable changes to **anchor** are tracked here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0] — 2026-05-21
+
+**Feature release**: 5 new slash commands + 5 init-claude-md templates + playbook docs. Driven by user request: "anchor 已经够稳，加点真有用的板块". This focuses on UX gaps — cost transparency, multi-session continuity, project-onboarding speed — without adding more PreToolUse rules (which has converged after 14 audit rounds).
+
+### Added — 5 new slash commands
+
+- **`/cost`** (`commands/cost.md`): current-session token / time / estimated cost summary. Calls `npx ccusage@latest` if available, else estimates from transcript length + Claude 4.7 rate card. Output includes tips ("cache hit rate < 50% → restart session" etc.) based on observed patterns.
+- **`/report [days]`** (`commands/report.md`): multi-session aggregate report (default 30 days, configurable). Drift heatmap of top blocked patterns, PostToolUse lint distribution, autonomous mode usage, period-over-period trend comparison, and 3 highest-leverage improvement suggestions. Use cases: personal weekly retrospective (`/report 7`), team review (`/report 30`), quarterly retro (`/report 90`).
+- **`/save [label]`** (`commands/save.md`): persist current session's task list to `~/.anchor/saved-tasks/<label>.md` as human-readable markdown. Doesn't modify the active task list (cp not mv). Use for end-of-day stops, pre-compact safety, branch-comparing experiment paths.
+- **`/resume [label]`** (`commands/resume.md`): restore a previously-saved task list into current session via `TaskCreate`. Lists saved files when no label given. Default skips completed tasks (with opt-in to include them). Pairs with `/save`.
+- **`/ec`** (already added v1.5.0 as alias): listed here for completeness.
+
+### Added — 5 init-claude-md templates
+
+`init-claude-md` previously had one generic skeleton. Now ships 5 stack-specific templates in `skills/anchor/references/templates/`:
+
+- **`web-app.md`** — Express / Django / Flask / Rails / FastAPI / NextJS (routes, DB layer, auth, API conventions, security notes)
+- **`library.md`** — npm/pip/cargo published library (API surface, semver discipline, test matrix, release flow)
+- **`cli-tool.md`** — Go/Rust/Python CLI (exit codes, UX rules, shell completion, install methods)
+- **`data-pipeline.md`** — Airflow/Dagster/dbt ETL (DAGs, schedule conventions, partition rules, monitoring)
+- **`default.md`** — generic (the old skeleton, fallback when type unknown)
+
+`commands/init-claude-md.md` updated to auto-detect project type and pick the right template, OR accept `--template=X` arg. Onboarding to a new project goes from "write CLAUDE.md from scratch" to "5-minute polish of populated stack-aware skeleton".
+
+### Added — `docs/playbook.md`
+
+5 typical-scenario walkthroughs, ~150 lines:
+
+1. **New project onboarding** — `/init-claude-md` → `/lock` → first task
+2. **Long refactor without drift** — `/lock` + autonomous mode + `/status` + `/recap` + `/done`
+3. **Pre-merge security audit** — `/diff` → multi-pass `/scan` → `/codex:review` → `/cleanup` → `/done`
+4. **Multi-agent parallel scaffolding** — 4 independent subtasks in one message
+5. **Long task cross-session continuity** — `/save` end-of-day → `/resume` next morning
+
+Plus a "I just started using anchor" minimal flow at the bottom (just 4 commands: `/lock` → work → `/pit` → `/done`).
+
+### Updated
+
+- **`commands/init-claude-md.md`** — auto-detect + template selection logic
+- **`install.sh`** / **`uninstall.sh`** — new commands in the loop, templates dir in cp / rm
+- **README.md** / **README.en.md** — "11 slash commands" → "16 slash commands"
+
+### Verified — 13 suites, 299/299 pass
+
+Zero regression on the 299 PreToolUse cases. New commands don't touch the hook logic. Live install run: 16 commands + 5 templates land in `~/.claude/commands/` and `~/.claude/skills/anchor/references/templates/`.
+
+### Plugin manifest
+
+- Minor version bump 1.5.3 → 1.6.0 (additive feature release, no breaking changes).
+
 ## [1.5.3] — 2026-05-21
 
 User-reported 3 bugs in v1.5.2 (round 14). All fixed.

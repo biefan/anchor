@@ -72,12 +72,13 @@ except OSError:
 fi
 
 # ---- 1. Claude Code: skill + commands ----
-mkdir -p "$CLAUDE_DIR/skills/anchor/references"
+mkdir -p "$CLAUDE_DIR/skills/anchor/references/templates"
 mkdir -p "$CLAUDE_DIR/skills/anchor/scripts"
 mkdir -p "$CLAUDE_DIR/commands"
 
 cp "$SCRIPT_DIR/skills/anchor/SKILL.md" "$CLAUDE_DIR/skills/anchor/"
 cp "$SCRIPT_DIR/skills/anchor/references/"*.md "$CLAUDE_DIR/skills/anchor/references/"
+cp "$SCRIPT_DIR/skills/anchor/references/templates/"*.md "$CLAUDE_DIR/skills/anchor/references/templates/"
 cp "$SCRIPT_DIR/skills/anchor/scripts/"*.sh "$CLAUDE_DIR/skills/anchor/scripts/"
 cp "$SCRIPT_DIR/skills/anchor/scripts/"*.py "$CLAUDE_DIR/skills/anchor/scripts/"
 chmod +x "$CLAUDE_DIR/skills/anchor/scripts/"*.sh "$CLAUDE_DIR/skills/anchor/scripts/"*.py
@@ -233,14 +234,15 @@ fi
 
 # ---- 3. Codex CLI (if installed) ----
 if command -v codex >/dev/null 2>&1 && [ -d "$CODEX_DIR" ]; then
-    mkdir -p "$CODEX_DIR/skills/anchor/references"
+    mkdir -p "$CODEX_DIR/skills/anchor/references/templates"
     mkdir -p "$CODEX_DIR/skills/anchor/scripts"
     cp "$SCRIPT_DIR/skills/anchor/SKILL.md" "$CODEX_DIR/skills/anchor/"
     cp "$SCRIPT_DIR/skills/anchor/references/"*.md "$CODEX_DIR/skills/anchor/references/"
+    cp "$SCRIPT_DIR/skills/anchor/references/templates/"*.md "$CODEX_DIR/skills/anchor/references/templates/"
     cp "$SCRIPT_DIR/skills/anchor/scripts/"*.sh "$CODEX_DIR/skills/anchor/scripts/"
     cp "$SCRIPT_DIR/skills/anchor/scripts/"*.py "$CODEX_DIR/skills/anchor/scripts/"
     chmod +x "$CODEX_DIR/skills/anchor/scripts/"*.sh "$CODEX_DIR/skills/anchor/scripts/"*.py
-    for cmd in lock pit scan "done" next recap init-claude-md status ship diff cleanup; do
+    for cmd in lock pit scan "done" next recap init-claude-md status ship diff cleanup ec cost report save resume; do
         mkdir -p "$CODEX_DIR/skills/$cmd"
         cp "$SCRIPT_DIR/commands/$cmd.md" "$CODEX_DIR/skills/$cmd/SKILL.md"
     done

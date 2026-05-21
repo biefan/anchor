@@ -5,7 +5,7 @@
 
 **English** | [中文](README.md)
 
-> Engineering discipline for Claude Code & Codex CLI: a skill + 11 slash commands + 4 safety hooks that keep AI on-task, prevent drift, and don't stop until the job is done.
+> Engineering discipline for Claude Code & Codex CLI: a skill + 16 slash commands + 4 safety hooks that keep AI on-task, prevent drift, and don't stop until the job is done.
 
 ## Field report (v1.4.6 re-run across 3 real scenarios)
 

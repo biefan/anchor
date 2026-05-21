@@ -142,19 +142,22 @@ fi
 
 # ---- 2. Now safe to remove script files. ----
 # Skill
-if [ -d "$CLAUDE_DIR/skills/efficient-coding" ]; then
+if [ -d "$CLAUDE_DIR/skills/anchor" ] || [ -d "$CLAUDE_DIR/skills/efficient-coding" ]; then
     echo "→ Removing $CLAUDE_DIR/skills/anchor/"
     rm -f "$CLAUDE_DIR/skills/anchor/SKILL.md"
+    rm -f "$CLAUDE_DIR/skills/anchor/references/templates/"*.md
     rm -f "$CLAUDE_DIR/skills/anchor/references/"*.md
     rm -f "$CLAUDE_DIR/skills/anchor/scripts/"*.sh
     rm -f "$CLAUDE_DIR/skills/anchor/scripts/"*.py
+    rmdir "$CLAUDE_DIR/skills/anchor/references/templates" 2>/dev/null || true
     rmdir "$CLAUDE_DIR/skills/anchor/references" 2>/dev/null || true
     rmdir "$CLAUDE_DIR/skills/anchor/scripts" 2>/dev/null || true
+    rmdir "$CLAUDE_DIR/skills/anchor" 2>/dev/null || true
     rmdir "$CLAUDE_DIR/skills/efficient-coding" 2>/dev/null || true
 fi
 
 # Commands
-for cmd in lock pit scan "done" next recap init-claude-md status ship diff cleanup; do
+for cmd in lock pit scan "done" next recap init-claude-md status ship diff cleanup ec cost report save resume; do
     if [ -f "$CLAUDE_DIR/commands/$cmd.md" ]; then
         echo "→ Removing $CLAUDE_DIR/commands/$cmd.md"
         rm -f "$CLAUDE_DIR/commands/$cmd.md"
@@ -168,18 +171,21 @@ if [ -f "$CLAUDE_DIR/.efficient-coding-autonomous" ]; then
 fi
 
 # Codex CLI install (if present)
-if [ -d "$CODEX_DIR/skills/ec" ]; then
+if [ -d "$CODEX_DIR/skills/anchor" ] || [ -d "$CODEX_DIR/skills/ec" ]; then
     echo "→ Removing $CODEX_DIR/skills/anchor/"
     rm -f "$CODEX_DIR/skills/anchor/SKILL.md"
+    rm -f "$CODEX_DIR/skills/anchor/references/templates/"*.md
     rm -f "$CODEX_DIR/skills/anchor/references/"*.md
     rm -f "$CODEX_DIR/skills/anchor/scripts/"*.sh
     rm -f "$CODEX_DIR/skills/anchor/scripts/"*.py
+    rmdir "$CODEX_DIR/skills/anchor/references/templates" 2>/dev/null || true
     rmdir "$CODEX_DIR/skills/anchor/references" 2>/dev/null || true
     rmdir "$CODEX_DIR/skills/anchor/scripts" 2>/dev/null || true
+    rmdir "$CODEX_DIR/skills/anchor" 2>/dev/null || true
     rmdir "$CODEX_DIR/skills/ec" 2>/dev/null || true
 fi
 # Codex commands-as-skills
-for cmd in lock pit scan "done" next recap init-claude-md status ship diff cleanup; do
+for cmd in lock pit scan "done" next recap init-claude-md status ship diff cleanup ec cost report save resume; do
     if [ -d "$CODEX_DIR/skills/$cmd" ]; then
         echo "→ Removing $CODEX_DIR/skills/$cmd/"
         rm -f "$CODEX_DIR/skills/$cmd/SKILL.md"
