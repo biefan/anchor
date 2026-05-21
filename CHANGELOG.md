@@ -3,6 +3,72 @@
 All notable changes to **anchor** are tracked here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.10.0] — 2026-05-21
+
+**Review-feedback release**. User gave 8.5/10 review with 3 actionable gaps (gap 3 — auto-recording blocked patterns as pitfalls — was discussed and declined as over-engineering). v1.10.0 fixes the other 3.
+
+### Added — Gap 1: 4 new security pattern categories
+
+In `ADMIN_DESTRUCTIVE_PATTERNS` dispatch table:
+
+- **`chown -R` to system dirs** — covers `-R[a-zA-Z]*` (catching `-Rh` / `-RP` / `-RHP`) + `--recursive` against `/etc`, `/var`, `/usr`, `/bin`, `/sbin`, `/lib`, `/lib64`, `/boot`, `/root`, `/home`, `/dev`, `/proc`, `/sys`. Blocks ownership-transfer attacks (`chown -R attacker /etc`).
+- **`source` / `.` builtin loading privileged scripts** — `/etc/profile.d/*`, process substitution `<(...)`, backticks, `$(...)`, dotfile poisoning vectors all blocked.
+- **`mount --bind` / `--rbind` / `-B` / `--move`** — namespace-view-changing mounts that can hide files.
+- **`sysctl` dangerous kernel params** — `dmesg_restrict=0`, `ip_forward=1`, `kptr_restrict=0`, `randomize_va_space=0`, `unprivileged_userns_clone=1`, `suid_dumpable=1/2`, `ptrace_scope=0`, `sysctl -p <file>`.
+
+Implementation bug found and fixed: shlex `punctuation_chars=True` splits `$` from `(`, so `\$\(` regex missed. Fixed to `\$\s*\(`.
+
+### Fixed — Gap 2: Test path portability
+
+All 14 existing regression test files used `HOOK = "skills/anchor/scripts/pre-tool-danger.sh"` (relative path) — only worked from repo root. From any other cwd they would silently fail.
+
+Patched all 14 (10 `.py` + 4 `.sh`) to use portable resolution: try `~/.claude/skills/anchor/scripts/` first, fall back to `$SCRIPT_DIR/../../skills/anchor/scripts/`, then relative. Verified by running full 15 suites from `/tmp` AND repo root — both 364/364 pass.
+
+### Fixed — Gap 4: macOS / weird-FS lock fallback completeness
+
+`install.sh` had a 2-tier lock with silent-WARN-and-proceed fallback when both `flock(1)` and Python `fcntl.flock` failed. Added 3rd-tier mkdir-atomicity fallback (POSIX universal, works on ANY filesystem):
+
+```bash
+LOCK_DIR="${LOCK_FILE}.d"
+if ! mkdir "$LOCK_DIR" 2>/dev/null; then
+    echo "ERROR: cannot acquire lock — recovery: rmdir $LOCK_DIR if stale" >&2
+    exit 1
+fi
+trap 'rmdir "$LOCK_DIR" 2>/dev/null' EXIT
+```
+
+Now: never silently loses serialization. Either acquires successfully OR exits with clear error + recovery hint.
+
+### Declined — Gap 3 (auto-record blocked patterns as pitfalls)
+
+User's review proposed auto-recording PreToolUse-blocked patterns into the `~/.anchor/memory/pitfalls/` index. Declined as over-engineering:
+
+- Blocked cmds ≠ user intent (many are obfuscation tests / accidental triggers)
+- Would pollute pitfall index — `/recall` for real bugs gets noise
+- User actively running `/pit` is the healthy boundary — keeps memory loop curated
+
+### Added — `test-v1.10-review-gaps.py`
+
+31 cases:
+- 6 chown (4 BLOCK + 2 PASS regressions)
+- 9 source/. (7 BLOCK + 2 PASS regressions)
+- 5 mount (4 BLOCK + 1 PASS regression)
+- 11 sysctl (8 BLOCK + 3 PASS regressions)
+
+Itself demonstrates the portable-path resolution required by Gap 2.
+
+### Verified
+
+- **15 regression suites / 364/364 pass** (333 prior + 31 new + 0 regression)
+- shellcheck PASS on all 12 shell scripts (CI rules)
+- jsonlint PASS on all manifests
+- Tests pass from `/tmp` AND repo root (Gap 2 demo)
+- `install.sh` exits cleanly on Linux (Gap 4 fallback only triggers on weird FS)
+
+### Plugin manifest
+
+- Minor 1.9.1 → 1.10.0.
+
 ## [1.9.1] — 2026-05-21
 
 **Phase 1 testing** patch — user asked "we just made it, can we test everything?" Wrote a comprehensive end-to-end test suite that exercises every v1.7-v1.9 feature: all 5 hooks, all helper scripts, the memory loop, all 22 commands' file syntax, all 5 templates, install/uninstall idempotency, and plugin manifest consistency.
