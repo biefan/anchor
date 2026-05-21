@@ -1,0 +1,83 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  shellcheck:
+    name: shellcheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install shellcheck
+        run: sudo apt-get update && sudo apt-get install -y shellcheck
+      - name: Find and check all shell scripts
+        run: |
+          set -e
+          mapfile -t SCRIPTS < <(find . -type f -name '*.sh' -not -path '*/.git/*')
+          echo "Found ${#SCRIPTS[@]} shell script(s):"
+          printf '  %s\n' "${SCRIPTS[@]}"
+          # SC1091 = sourced file not found; SC2034 = unused vars in heredoc python literals
+          shellcheck --exclude=SC1091,SC2034 "${SCRIPTS[@]}"
+
+  jsonlint:
+    name: validate JSON
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate every *.json (skip evals/results)
+        run: |
+          set -e
+          mapfile -t FILES < <(find . -type f -name '*.json' -not -path '*/.git/*' -not -path '*/evals/results/*')
+          echo "Validating ${#FILES[@]} JSON file(s):"
+          for f in "${FILES[@]}"; do
+            echo "  $f"
+            python3 -m json.tool "$f" > /dev/null
+          done
+
+  install-smoke:
+    name: install.sh smoke test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run install.sh --no-hooks (no codex CLI in CI, so only Claude Code path runs)
+        run: |
+          set -e
+          ./install.sh --no-hooks
+      - name: Verify files landed in ~/.claude/
+        run: |
+          set -e
+          test -f "$HOME/.claude/skills/efficient-coding/SKILL.md" || { echo "SKILL.md missing"; exit 1; }
+          test -x "$HOME/.claude/skills/efficient-coding/scripts/stop-self-check.sh" || { echo "stop-self-check.sh missing/not executable"; exit 1; }
+          for cmd in lock pit scan "done" next recap init-claude-md; do
+            test -f "$HOME/.claude/commands/$cmd.md" || { echo "command $cmd.md missing"; exit 1; }
+          done
+          echo "All expected files present."
+      - name: Verify hooks NOT merged when --no-hooks used
+        run: |
+          # If no prior settings.json existed, --no-hooks should not create one either.
+          if [ -f "$HOME/.claude/settings.json" ]; then
+            # If it exists (some other process created it), make sure our hook scripts aren't referenced
+            if grep -q 'efficient-coding/scripts/' "$HOME/.claude/settings.json"; then
+              echo "ERROR: --no-hooks still wrote our hooks into settings.json"
+              exit 1
+            fi
+          fi
+          echo "OK: --no-hooks honored."
+      - name: Run uninstall.sh + verify cleanup
+        run: |
+          set -e
+          ./uninstall.sh
+          if [ -d "$HOME/.claude/skills/efficient-coding" ]; then
+            echo "ERROR: skill dir not removed"
+            exit 1
+          fi
+          for cmd in lock pit scan "done" next recap init-claude-md; do
+            if [ -f "$HOME/.claude/commands/$cmd.md" ]; then
+              echo "ERROR: $cmd.md not removed"; exit 1
+            fi
+          done
+          echo "OK: uninstall cleaned up."
