@@ -48,6 +48,16 @@ if command -v flock >/dev/null 2>&1; then
         echo "ERROR: could not acquire $LOCK_FILE within 30s — another install/uninstall is running?" >&2
         exit 1
     fi
+else
+    if ! python3 -c "
+import fcntl, sys
+try:
+    fcntl.flock(9, fcntl.LOCK_EX | fcntl.LOCK_NB)
+except OSError:
+    sys.exit(1)
+" 2>/dev/null; then
+        echo "WARNING: could not acquire $LOCK_FILE (no flock(1), Python fcntl declined); proceeding without serialization." >&2
+    fi
 fi
 
 # ---- 1. Clean settings.json hook entries FIRST (before deleting scripts). ----

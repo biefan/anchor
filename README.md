@@ -49,9 +49,9 @@ cd ~/anchor
 ```
 
 `install.sh` 一键完成：
-1. 复制 skill / 7 个 slash commands / hook 脚本 到 `~/.claude/`
+1. 复制 skill / 11 个 slash commands / hook 脚本 到 `~/.claude/`
 2. **自动 merge hooks 到 `~/.claude/settings.json`**（带 timestamp backup，可用 `--no-hooks` 跳过）
-3. 检测到 codex CLI 就同时安装到 `~/.codex/`（skill + 7 commands as skills）
+3. 检测到 codex CLI 就同时安装到 `~/.codex/`（skill + 11 commands as skills）
 4. 重复跑无副作用（idempotent，不会重复 merge hooks）
 
 **首次安装后需要重启 Claude Code**（如果 `~/.claude/skills/` 是首次创建的话）——live change detection 不监视会话启动时不存在的顶层目录。
@@ -264,7 +264,7 @@ codex plugin add anchor@anchor
 ./uninstall.sh
 ```
 
-会移除 `~/.claude/skills/efficient-coding/` 和 7 个 `~/.claude/commands/*.md`，以及 `~/.codex/skills/{ec,lock,pit,scan,done,next,recap,init-claude-md}/`（如有）。`settings.json` 里的 hook 配置目前需要手动从 `hooks` 段移除。
+会移除 `~/.claude/skills/efficient-coding/`、11 个 `~/.claude/commands/*.md`，以及 `~/.codex/skills/` 下的所有 anchor skill 目录（如有）。**`settings.json` 里 home-scheme 的 anchor hook 条目会自动清掉**（带 timestamp backup）；plugin-marketplace 安装的 hook 条目默认保留——它们由 plugin 系统管理。要一并清掉 plugin-scheme hook 加 `--all-hooks` flag。
 
 ## 致谢与参考
 

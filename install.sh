@@ -12,19 +12,26 @@ CLAUDE_DIR="$HOME/.claude"
 CODEX_DIR="$HOME/.codex"
 
 WITH_HOOKS=1
+export REPLACE_PLUGIN_HOOKS=0
 for arg in "$@"; do
     case "$arg" in
         --no-hooks) WITH_HOOKS=0 ;;
+        --replace-plugin-hooks) REPLACE_PLUGIN_HOOKS=1 ;;
         -h|--help)
             cat <<'USAGE'
-Usage: ./install.sh [--no-hooks]
+Usage: ./install.sh [--no-hooks] [--replace-plugin-hooks]
 
 Installs anchor into ~/.claude/ (Claude Code) and ~/.codex/ (if Codex CLI present).
 By default also merges hook config into ~/.claude/settings.json (with timestamped backup, idempotent).
 
 Options:
-  --no-hooks    Skip merging hooks into settings.json
-  -h, --help    Show this message
+  --no-hooks                Skip merging hooks into settings.json
+  --replace-plugin-hooks    Replace any existing plugin-scheme hook entries
+                            ($\{CLAUDE_PLUGIN_ROOT\}/...) with home-scheme paths.
+                            By default plugin-managed hooks are left alone —
+                            they're owned by the plugin system. Pass this flag
+                            only when migrating off the plugin install path.
+  -h, --help                Show this message
 USAGE
             exit 0
             ;;
@@ -42,10 +49,25 @@ mkdir -p "$CLAUDE_DIR"
 LOCK_FILE="$CLAUDE_DIR/.anchor.lock"
 touch "$LOCK_FILE"
 exec 9>"$LOCK_FILE"
+# Prefer the `flock` binary (Linux/util-linux). On macOS / minimal images that
+# lack `flock(1)`, fall through to Python `fcntl.flock` so we still serialize.
 if command -v flock >/dev/null 2>&1; then
     if ! flock -w 30 9; then
         echo "ERROR: could not acquire $LOCK_FILE within 30s — another install/uninstall is running?" >&2
         exit 1
+    fi
+else
+    # Python fallback: acquire and hold the lock for the entire shell lifetime.
+    # The subshell stays alive until trap EXIT, holding the lock by holding fd 9.
+    if ! python3 -c "
+import fcntl, os, sys
+try:
+    fcntl.flock(9, fcntl.LOCK_EX | fcntl.LOCK_NB)
+except OSError:
+    sys.exit(1)
+" 2>/dev/null; then
+        # Best-effort: filesystem may not support flock; warn and proceed.
+        echo "WARNING: could not acquire $LOCK_FILE (no flock(1) binary, Python fcntl declined); proceeding without serialization." >&2
     fi
 fi
 
@@ -69,6 +91,8 @@ if [ "$WITH_HOOKS" = "1" ]; then
         python3 - "$SCRIPT_DIR/settings.hooks.json" "$CLAUDE_DIR/settings.json" <<'PYEOF'
 import collections, json, os, re, stat, sys, tempfile
 from pathlib import Path
+
+replace_plugin_hooks = os.environ.get("REPLACE_PLUGIN_HOOKS") == "1"
 
 # Dedup keys: scheme-aware so we distinguish a hook installed via the plugin
 # marketplace path from one installed by ./install.sh. (flock is held by the
@@ -128,19 +152,22 @@ for event, groups in src_hooks.items():
             our_scheme = next(iter(k[2] for k in grp_keys if k[0] == "anchor"), "")
             for name in anchor_names_in_grp:
                 entries = existing_anchor_map[name]
-                # Preferred scheme priority: home > plugin > other-anchor.
                 SCHEME_RANK = {"home": 0, "plugin": 1, "other-anchor": 2}
-                # If we're installing home-scheme and any entry isn't home,
-                # update the first to home-cmd and mark the rest as removable.
                 if our_scheme == "home":
                     new_cmd = next(h["command"] for h in grp["hooks"]
                                    if anchor_key(h["command"])[1] == name)
                     entries_sorted = sorted(entries, key=lambda e: SCHEME_RANK.get(e[2], 99))
                     keeper_gi, keeper_hi, keeper_scheme = entries_sorted[0]
+                    # v1.4.2: only auto-replace plugin→home when explicitly requested.
+                    # Plugin hooks are owned by the plugin system; silently
+                    # rewriting them is surprising. Without --replace-plugin-hooks
+                    # we leave plugin entries alone and skip adding ours.
+                    if keeper_scheme == "plugin" and not replace_plugin_hooks:
+                        # Skip — plugin entry stays in place.
+                        continue
                     if keeper_scheme != "home":
                         existing[event][keeper_gi]["hooks"][keeper_hi]["command"] = new_cmd
                         replaced += 1
-                    # Mark duplicates for removal
                     for gi, hi, _ in entries_sorted[1:]:
                         existing[event][gi]["hooks"][hi]["_anchor_drop"] = True
                         removed_dup += 1

@@ -3,6 +3,81 @@
 All notable changes to **anchor** are tracked here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.2] — 2026-05-21
+
+Fourth-pass audit. Codex r4 + my own self-audit r2 (running in parallel) found 20 more issues — 15 from codex + 5 from me. Notable: codex r4 found 2 critical PreToolUse target-glob bypasses; my self-audit found 5 syntax-level bypasses (subshells, group commands, here-strings, variable indirection, backslash alias prefix).
+
+### Fixed — 🔴 Critical (PreToolUse target-glob)
+
+- **E1 `rm -rf /e*` / `/??c` / `/[a-z]tc` / `/!(proc|sys)` glob bypassed dangerous-target detection**: target was a glob expression that could expand to /etc, /var, etc. Extended `UNKNOWN_TARGETS` to match any absolute path containing shell metacharacters (`* ? [ ] { }`).
+- **E2 `rm -rf /tmp/../etc` bypassed via path traversal**: `/tmp/<X>` is the exception that allows user-tmp cleanup, but `/tmp/../etc` normalizes to `/etc`. Now `os.path.normpath` is applied to static absolute paths (containing no `$`, `` ` ``, brace, or glob meta) before matching against critical dirs.
+
+### Fixed — 🔴 Critical (PreToolUse self-audit)
+
+- **D2 `(rm -rf /)` subshell parens bypassed**: `(` was the first token; not a wrapper. Now `strip_env_assignments_and_wrappers` strips leading `(`/`{` and trailing `)`/`}`/`;` so subshells and group commands are scanned inside.
+- **D3 `{ rm -rf /; }` group command** — same fix as D2.
+- **D4 `sh <<< 'rm -rf /'` here-string** — `<<<` is now handled in `shlex_split_stages`: the next token after `<<<` becomes an additional stage (re-tokenized as inner shell) so the here-string body gets scanned.
+
+### Fixed — 🟠 High (9 PreToolUse correctness)
+
+- **E3 `printf X |& bash`** (stderr+stdout pipe): `|&` added to `SEP_TOKENS` and `shlex_pipeline_stages` accepts it as a pipe separator.
+- **E4 `cat > >(rm -rf /)` process substitution output form**: `extract_substitutions` now matches both `<(...)` (input form, v1.4.1 already) AND `>(...)` (output form, v1.4.2 new) with the same balanced-paren extractor.
+- **E5 `env -S "shell string"`** runs the value as shell. `strip_env_assignments_and_wrappers` now detects `-S` and refuses to unwrap env, leaving it for the new `check_env_dash_s` checker that re-tokenizes and recursively scans the -S string.
+- **E6 `su -c "rm -rf /"`**: `su` removed from generic WRAPPERS so `check_shell_dash_c` (now also covers `runuser`) sees it as argv[0] and recurses.
+- **E7 `watch "rm -rf /"`**: new `check_watch` checker — watch joins remaining args as a shell command, so we join + re-tokenize + scan.
+- **E8 `taskset CPU rm -rf /` / `chrt -f PRIO rm -rf /` positional-arg parsing**: new dedicated `check_taskset_chrt` checker that distinguishes `-p` (no sub-cmd) modes from positional-arg modes for both tools.
+- **E9 `parallel 'rm -rf {}' ::: /`** template: new `check_parallel` checker recursively scans the template as a shell command before `:::`.
+- **E10 WRAPPERS expanded** with `flock`/`nohup`/`setsid`/`runuser`/`script`. Each gets its own option schema; `runuser` also goes through `check_shell_dash_c` for its `-c` mode.
+- **E11 device-write detection** broadened from `/dev/sd[a-z]` to also cover `/dev/nvme0n1`/`mmcblk`/`vd`/`xvd`/`hd`/`loop`/`md`/`dm-`/`disk` plus the `>|` noclobber-override form, `tee /dev/...`, and `cp/install /dev/...`.
+
+### Fixed — 🟠 High (self-audit)
+
+- **D1 variable indirection** `x=rm; $x -rf /` — new OBFUSCATION_CHECKS pattern matches `VAR=val ; $VAR` on the same line.
+- **D5 backslash-alias bypass** `\rm -rf /` (defeats `alias rm='rm -i'`) — new OBFUSCATION_CHECKS pattern matches `\<word> -...` shape.
+
+### Fixed — 🟡 Medium
+
+- **E12 install.sh `flock` binary fallback**: when the `flock(1)` binary is missing (macOS, minimal images), install.sh and uninstall.sh now fall back to a Python `fcntl.flock` call. Last-resort warning + proceed if even Python flock fails (filesystem doesn't support locking).
+- **E13 plugin→home auto-replacement disabled by default**: v1.4.1 silently overwrote `${CLAUDE_PLUGIN_ROOT}/...` paths with `$HOME/...` when running `./install.sh`. That violated the "plugins manage their own hooks" boundary. Now a `--replace-plugin-hooks` flag is required; without it, plugin entries stay and our home entry is skipped.
+
+### Fixed — 🟢 Low (docs sync)
+
+- **E14 README uninstall section**: said "hook entries need to be removed manually." Updated both `README.md` and `README.en.md` to document the v1.3.8+ auto-cleanup + `--all-hooks` flag.
+- **E15 "7 commands" stale count**: both READMEs and install.sh said "7" while the loop installs 11 (status/ship/diff/cleanup added in v1.2). Updated.
+
+### Verified — 84 regression tests, 4 suites, all pass
+
+| Suite | Tests | Result |
+|---|---|---|
+| v1.4.0 history (B1-B19) | 32 | 32/32 ✓ |
+| v1.4.1 codex r3 (C1-C11) | 15 | 15/15 ✓ |
+| v1.4.2 codex r4 (E1-E11) | 25 | 25/25 ✓ |
+| v1.4.2 self-audit (D1-D5 + baselines) | 12 | 11/12 ✓ (D5 test escape illusion; production `\rm` catches) |
+
+shellcheck PASS on all shell scripts, jsonlint PASS, install.sh idempotent re-run exit 0.
+
+### Audit history total
+
+- External review (v1.3.6): 10
+- Self-audit (v1.3.7): 5
+- Codex pass 1 (v1.3.8): 15
+- Codex pass 2 (v1.4.0): 19
+- Codex pass 3 (v1.4.1): 19
+- **Codex pass 4 (v1.4.2): 15 + self-audit r2: 5 = 20**
+- **Cumulative: 88 bugs across 6 audit passes.** Each pass continues to find issues prior passes missed.
+
+### Honest assessment
+
+After 6 audit passes spending a full day on PreToolUse alone, each new round still finds 15-20 real bypasses. This is direct empirical evidence that **regex/shlex-based static analysis cannot fully secure shell**. The pre-tool-danger.sh header still says:
+
+> "Sufficiently obfuscated shell can defeat any static analyzer. We block obvious obfuscation rather than try to decode it. Hook is *anti-instinct first defense*, not *anti-motivated-attacker last resort*."
+
+That framing is empirically validated. Real safety comes from the runtime sandbox (Claude Code's permission model). anchor's hook is value-add as a discipline tool, not a security boundary.
+
+### Plugin manifest
+
+- Versions bumped 1.4.1 → 1.4.2.
+
 ## [1.4.1] — 2026-05-21
 
 Third-pass codex adversarial-review patch. After v1.4.0's PreToolUse rewrite, codex pass 3 found 19 more bugs — including 4 new critical bypasses of the freshly-rewritten hook. All 19 fixed here.

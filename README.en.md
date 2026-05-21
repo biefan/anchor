@@ -49,9 +49,9 @@ cd ~/anchor
 
 `install.sh` does:
 
-1. Copies skill / 7 slash commands / hook scripts to `~/.claude/`
+1. Copies skill / 11 slash commands / hook scripts to `~/.claude/`
 2. **Auto-merges hooks into `~/.claude/settings.json`** (timestamped backup; `--no-hooks` to skip)
-3. If `codex` CLI is detected, also installs to `~/.codex/` (skill + 7 commands)
+3. If `codex` CLI is detected, also installs to `~/.codex/` (skill + 11 commands as skills)
 4. Idempotent — re-running doesn't duplicate hooks
 
 **Restart Claude Code after first install** if `~/.claude/skills/` didn't exist before — live change detection doesn't watch top-level dirs created mid-session.
@@ -259,7 +259,7 @@ New users → **plugin install recommended**. Existing `install.sh` users: hooks
 ./uninstall.sh
 ```
 
-Removes `~/.claude/skills/efficient-coding/` and the 7 `~/.claude/commands/*.md`, plus `~/.codex/skills/{ec,lock,pit,scan,done,next,recap,init-claude-md}/` if present. The hook entries in `settings.json` need to be removed manually for now.
+Removes `~/.claude/skills/efficient-coding/`, all 11 `~/.claude/commands/*.md`, and any anchor skill dirs under `~/.codex/skills/` if present. **Home-scheme anchor hook entries in `settings.json` are automatically cleaned** (with a timestamped backup); plugin-marketplace hook entries are left alone by default — they're owned by the plugin system. Pass `--all-hooks` to clear plugin-scheme entries too.
 
 ## Credits
 
