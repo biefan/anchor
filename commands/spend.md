@@ -2,7 +2,7 @@
 description: 当前 session 的 token / 时长 / 估算成本摘要。Use when you want to know how much this session has spent so far.
 ---
 
-# /cost — session cost summary
+# /spend — session cost summary
 
 报告当前 session 的资源使用 + 估算成本。
 

@@ -157,7 +157,7 @@ if [ -d "$CLAUDE_DIR/skills/anchor" ] || [ -d "$CLAUDE_DIR/skills/efficient-codi
 fi
 
 # Commands
-for cmd in lock pit scan "done" next recap init-claude-md status ship diff cleanup ec cost report save resume milestone recall remember decide snapshot lean; do
+for cmd in lock pit scan "done" next recap init-claude-md status ship diff cleanup ec spend report save resume-task milestone recall remember decide snapshot lean; do
     if [ -f "$CLAUDE_DIR/commands/$cmd.md" ]; then
         echo "→ Removing $CLAUDE_DIR/commands/$cmd.md"
         rm -f "$CLAUDE_DIR/commands/$cmd.md"
@@ -185,7 +185,7 @@ if [ -d "$CODEX_DIR/skills/anchor" ] || [ -d "$CODEX_DIR/skills/ec" ]; then
     rmdir "$CODEX_DIR/skills/ec" 2>/dev/null || true
 fi
 # Codex commands-as-skills
-for cmd in lock pit scan "done" next recap init-claude-md status ship diff cleanup ec cost report save resume milestone recall remember decide snapshot lean; do
+for cmd in lock pit scan "done" next recap init-claude-md status ship diff cleanup ec spend report save resume-task milestone recall remember decide snapshot lean; do
     if [ -d "$CODEX_DIR/skills/$cmd" ]; then
         echo "→ Removing $CODEX_DIR/skills/$cmd/"
         rm -f "$CODEX_DIR/skills/$cmd/SKILL.md"

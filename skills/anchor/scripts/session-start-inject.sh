@@ -7,6 +7,9 @@ set -e
 
 # shellcheck source=./_log_event.sh
 . "$(dirname "${BASH_SOURCE[0]}")/_log_event.sh"
+# shellcheck source=./_runtime.sh
+. "$(dirname "${BASH_SOURCE[0]}")/_runtime.sh"
+RUNTIME=$(detect_runtime)
 
 # Read hook input
 input=$(cat)
@@ -42,6 +45,11 @@ if [ -n "$contracts" ]; then
 else
     echo "**No project contracts found** in \`$cwd\`. Use neighbor files' actual style as the de facto standard."
 fi
+
+# v1.11.0: runtime detection — tell Claude which CLI it's running on
+echo ""
+echo "**Runtime**: \`$RUNTIME\`"
+runtime_tool_hints "$RUNTIME"
 
 # Git status (only if it's a git repo)
 if [ -d "$cwd/.git" ] || git -C "$cwd" rev-parse --git-dir >/dev/null 2>&1; then

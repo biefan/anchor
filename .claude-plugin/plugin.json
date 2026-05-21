@@ -1,6 +1,6 @@
 {
   "name": "anchor",
-  "version": "1.10.0",
+  "version": "1.11.0",
   "description": "Efficient-coding skill + 7 slash commands + 4 safety hooks for Claude Code (and Codex CLI). Anti-drift discipline, multi-pass vuln scans, E2E verification, pitfall writeback to CLAUDE.md, optional autonomous mode that won't stop until tasks are done.",
   "author": {
     "name": "biefan",

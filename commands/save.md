@@ -1,11 +1,11 @@
 ---
-description: 把当前 session 的 task list 持久化到 ~/.anchor/saved-tasks/，供后续 /resume 续接。Use when ending a long task mid-way (computer shutdown, end of day, switching context).
+description: 把当前 session 的 task list 持久化到 ~/.anchor/saved-tasks/，供后续 /resume-task 续接。Use when ending a long task mid-way (computer shutdown, end of day, switching context).
 argument-hint: "[label]"
 ---
 
 # /save — persist task list
 
-把当前 session 的 task list（含状态、subject、关联 sub-tasks）dump 到磁盘，**今后任意 session 用 `/resume` 续接**。
+把当前 session 的 task list（含状态、subject、关联 sub-tasks）dump 到磁盘，**今后任意 session 用 `/resume-task-task` 续接**。
 
 ### Steps
 
@@ -45,7 +45,7 @@ argument-hint: "[label]"
 4. **报告**：
    - 保存路径
    - 多少 task 已存
-   - 提示：`后续用 /resume <label> 续接`
+   - 提示：`后续用 /resume-task <label> 续接`
 
 ### 不做
 

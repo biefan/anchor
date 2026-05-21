@@ -3,6 +3,61 @@
 All notable changes to **anchor** are tracked here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.11.0] — 2026-05-21
+
+**Triple feature release**: 自动 save (dream mode) + runtime detection + 命令冲突避免。
+
+### Added — Auto-save (dream mode)
+
+`skills/anchor/scripts/auto-save.sh` 自动保存当前 task list 到 `~/.anchor/saved-tasks/auto-<reason>-<timestamp>.md`。**用户什么都不用做**——hook 触发时静默 save，相当于 anchor 给你 "做梦时也在保存"。
+
+集成点:
+- **PreCompact hook** 触发时（auto-compact 前）→ `auto-precompact-*.md`
+- **Stop hook** 触发时（autonomous mode + 有 pending tasks）→ `auto-stop-*.md`
+
+GC: 自动保留最近 20 个 `auto-*` 文件，更旧的清掉。**用户存盘永远不丢**：手动 `/save` 和 auto-save 是分开的（auto-* 只是 fallback）。
+
+### Added — Runtime detection
+
+`skills/anchor/scripts/_runtime.sh` 4-tier 检测当前 CLI runtime（claude-code / codex）:
+1. `$ANCHOR_RUNTIME` env var (用户 explicit override)
+2. Parent process name (`ps -o comm= -p $PPID`)
+3. CLI-specific env vars (`CLAUDE_CODE_VERSION` / `CODEX_VERSION` / etc.)
+4. Default `claude-code`
+
+SessionStart hook 现在注入 runtime 名 + tool name hints：
+- Claude Code → `TaskCreate / TaskUpdate / AskUserQuestion / Agent`
+- Codex → `plan_tool / update_plan` + 异步询问 in response
+
+### Fixed — Command name conflicts with Claude Code builtins
+
+发现 2 个潜在冲突（Claude Code 内建 `/cost` 和 `/resume`）：
+
+| 旧名 (v1.6.0–v1.10.0) | 新名 (v1.11.0+) | 为什么 |
+|---|---|---|
+| `/cost` | **`/spend`** | Claude Code 内建 `/cost`（显示 session token cost），避免 shadow |
+| `/resume` | **`/resume-task`** | Claude Code 内建 `/resume`（恢复 prior session），明确 scope is task-list |
+
+**Migration**: `install.sh` 自动删除旧 `cost.md` / `resume.md`（home + codex 两边），再 cp 新文件。重新 install 即升级，无需手动清理。
+
+### Changed
+
+- **`install.sh` 现在打印实际命令数**（之前 hard-coded "11 commands"，老旧）
+- **`README.md`** 之前已美化（v1.10.0 release 后）
+
+### Verified
+
+- **15 regression suites / 364/364 pass** — zero regression
+- shellcheck PASS on all 13 shell scripts (含新 _runtime.sh / auto-save.sh)
+- jsonlint PASS
+- 实测 auto-save: 创建 synthetic task → 跑 auto-save.sh → 文件正确写入 `~/.anchor/saved-tasks/auto-manual-*.md`
+- 实测 runtime detection: SessionStart 注入 `Runtime: claude-code` + tool hints
+- 实测 rename: Claude Code skill list 显示 `/spend` `/resume-task`，无 `/cost` `/resume` 冲突
+
+### Plugin manifest
+
+- Minor 1.10.0 → 1.11.0.
+
 ## [1.10.0] — 2026-05-21
 
 **Review-feedback release**. User gave 8.5/10 review with 3 actionable gaps (gap 3 — auto-recording blocked patterns as pitfalls — was discussed and declined as over-engineering). v1.10.0 fixes the other 3.

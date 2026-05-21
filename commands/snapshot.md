@@ -60,7 +60,7 @@ argument-hint: "<label>"
    - <from active-task>
    
    ## Restore instructions
-   - `/resume-snapshot <label>` 把 task list 重新加载到新 session
+   - `/resume-task-snapshot <label>` 把 task list 重新加载到新 session
    - 文件 diff 在 `files/` 子目录，git apply 可以重 stage
    - branch 切换：`git checkout <recorded-branch>`
    ```
@@ -88,7 +88,7 @@ argument-hint: "<label>"
 /snapshot try-approach-a
 # (跑了一阵发现不行)
 # 回到 approach-a 的起点：
-# /resume-snapshot before-redis-migration  (TODO: 这个 cmd 在 v1.8.0 也加)
+# /resume-task-snapshot before-redis-migration  (TODO: 这个 cmd 在 v1.8.0 也加)
 git checkout <branch from manifest>
 
 # 月底 sprint 收尾

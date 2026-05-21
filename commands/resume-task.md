@@ -3,7 +3,7 @@ description: 从 ~/.anchor/saved-tasks/ 读出之前 /save 的 task list，用 T
 argument-hint: "[label]"
 ---
 
-# /resume — restore saved task list
+# /resume-task — restore saved task list
 
 读出 `/save` 持久化的 task list，在**当前 session** 重建。
 
@@ -37,10 +37,10 @@ argument-hint: "[label]"
 
 ### 典型场景
 
-- 早上接昨天的活：`/resume end-of-day-refactor`
-- Compact 之后丢上下文：`/resume before-compact`
-- 切回主项目：`/resume migrate-api`
-- 选不同 approach：`/resume approach-a`（替代 approach-b 的 session）
+- 早上接昨天的活：`/resume-task end-of-day-refactor`
+- Compact 之后丢上下文：`/resume-task before-compact`
+- 切回主项目：`/resume-task migrate-api`
+- 选不同 approach：`/resume-task approach-a`（替代 approach-b 的 session）
 
 ### 不做
 

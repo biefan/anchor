@@ -76,6 +76,10 @@ EC_LOG_session_id="$session_id" \
 EC_LOG_pending_count="$pending_count" \
 ec_log_event
 
+# v1.11.0: auto-save before blocking — even if user overrides autonomous mode
+# and ends the session, they have a recoverable snapshot. Silent.
+bash "$(dirname "${BASH_SOURCE[0]}")/auto-save.sh" stop "$session_id" 2>/dev/null || true
+
 EC_STOP_INCOMPLETE="$incomplete" python3 - <<'PYEOF'
 import json, os
 incomplete = os.environ.get("EC_STOP_INCOMPLETE", "")

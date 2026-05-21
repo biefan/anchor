@@ -95,8 +95,12 @@ cp "$SCRIPT_DIR/skills/anchor/references/templates/"*.md "$CLAUDE_DIR/skills/anc
 cp "$SCRIPT_DIR/skills/anchor/scripts/"*.sh "$CLAUDE_DIR/skills/anchor/scripts/"
 cp "$SCRIPT_DIR/skills/anchor/scripts/"*.py "$CLAUDE_DIR/skills/anchor/scripts/"
 chmod +x "$CLAUDE_DIR/skills/anchor/scripts/"*.sh "$CLAUDE_DIR/skills/anchor/scripts/"*.py
+# v1.11.0: migration — old /cost and /resume conflict with Claude Code builtins.
+# Remove old names (if installed from v1.6.0–v1.10.0) before copying new files.
+rm -f "$CLAUDE_DIR/commands/cost.md" "$CLAUDE_DIR/commands/resume.md"
 cp "$SCRIPT_DIR/commands/"*.md "$CLAUDE_DIR/commands/"
-echo "  ✓ Claude Code: skill + 11 commands"
+cmd_count=$(find "$CLAUDE_DIR/commands" -maxdepth 1 -name '*.md' | wc -l | tr -d ' ')
+echo "  ✓ Claude Code: skill + $cmd_count commands"
 
 # ---- 2. Claude Code hooks (auto-merge into settings.json) ----
 if [ "$WITH_HOOKS" = "1" ]; then
@@ -255,11 +259,15 @@ if command -v codex >/dev/null 2>&1 && [ -d "$CODEX_DIR" ]; then
     cp "$SCRIPT_DIR/skills/anchor/scripts/"*.sh "$CODEX_DIR/skills/anchor/scripts/"
     cp "$SCRIPT_DIR/skills/anchor/scripts/"*.py "$CODEX_DIR/skills/anchor/scripts/"
     chmod +x "$CODEX_DIR/skills/anchor/scripts/"*.sh "$CODEX_DIR/skills/anchor/scripts/"*.py
-    for cmd in lock pit scan "done" next recap init-claude-md status ship diff cleanup ec cost report save resume milestone recall remember decide snapshot lean; do
+    # v1.11.0: also clean old cost/resume from codex
+    rm -rf "$CODEX_DIR/skills/cost" "$CODEX_DIR/skills/resume"
+    codex_count=0
+    for cmd in lock pit scan "done" next recap init-claude-md status ship diff cleanup ec spend report save resume-task milestone recall remember decide snapshot lean; do
         mkdir -p "$CODEX_DIR/skills/$cmd"
         cp "$SCRIPT_DIR/commands/$cmd.md" "$CODEX_DIR/skills/$cmd/SKILL.md"
+        codex_count=$((codex_count + 1))
     done
-    echo "  ✓ Codex CLI: skill + 11 commands"
+    echo "  ✓ Codex CLI: skill + $codex_count commands"
 fi
 
 echo ""

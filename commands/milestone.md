@@ -54,7 +54,7 @@ argument-hint: "<milestone-name>"
 5. **报告**：
    - milestone 名 + 写入路径
    - 已 completed tasks 数 / total
-   - 提示：明天 `/recap` 或 `/resume` 时 SessionStart hook 会自动注入这些信息
+   - 提示：明天 `/recap` 或 `/resume-task-task` 时 SessionStart hook 会自动注入这些信息
 
 ### 不做
 
@@ -71,5 +71,5 @@ argument-hint: "<milestone-name>"
 # (干 phase 2)
 /milestone extracted validate module
 # 收工 → /save end-of-day
-# 第二天 /resume，SessionStart 注入会显示"上一个 milestone: extracted validate module"
+# 第二天 /resume-task，SessionStart 注入会显示"上一个 milestone: extracted validate module"
 ```
