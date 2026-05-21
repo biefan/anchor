@@ -41,15 +41,46 @@ argument-hint: "[可选：要跳过的检查项，如 lint / e2e / codex]"
 
 任何一项答不上"显然没问题"，标记为遗留风险。
 
-### 5. codex review 必要性判断（按 SKILL.md "审查"节）
+### 5. codex review 必要性判断（按 SKILL.md "审查"节）—— **强制档**
 
-汇总本会话改动规模：
-- 改了几个文件、几行？
-- 是否涉及 auth / payment / 加密 / DB / 用户输入处理 / 网络？
-- 是否有并发 / 状态机 / 数据迁移？
+**先量化**，再判断。跑这两个命令拿数据：
 
-如果命中"必跑"档（>3 文件 / >50 行 / 业务逻辑 / 安全敏感 / 复杂逻辑）→ **提示运行 `/codex:review` 或 `/codex:adversarial-review`** ，等结果再 done。
-模糊地带 → 推荐跑（成本可控，盲点不可控）。
+```bash
+git diff --stat HEAD~1..HEAD 2>/dev/null || git diff --stat   # 文件数 + 行数
+git diff --name-only HEAD~1..HEAD 2>/dev/null || git diff --name-only
+```
+
+把结果套以下两张表，命中**任一行**就属于"必跑"档：
+
+| 规模触发器 | 阈值 |
+|---|---|
+| 改动文件数 | ≥ 3 |
+| 改动新增/删除行数（diffstat insertions + deletions） | ≥ 50 |
+
+| 内容触发器（文件路径或文件名包含以下关键词之一） | 例子 |
+|---|---|
+| `auth`, `login`, `session`, `password`, `token`, `oauth`, `jwt`, `crypto`, `encrypt`, `signature` | 认证 / 加密 |
+| `payment`, `pay`, `billing`, `charge`, `refund`, `invoice`, `subscription` | 支付 |
+| `migration`, `migrate`, `schema`, `db/`, `database/`, `*.sql` | 数据库迁移 |
+| `lock`, `mutex`, `semaphore`, `concurrent`, `parallel`, `goroutine`, `async`, `await`, `queue` | 并发 |
+| 涉及 user input 处理（`req.body`, `request.json`, `parseUrl`, `req.query`, `multer`, `multipart`） | 输入信任边界 |
+
+命中后**不只是"提示"** —— `/done` 流程**停在这里**，明确给用户两个选项之一来继续：
+
+```
+本次改动命中"codex 必跑"档：<具体触发了哪一行>
+请运行下面之一再回来跑 /done：
+
+  /codex:review                  # 实现质量审查
+  /codex:adversarial-review      # 挑战设计 / 隐含假设
+  /security-review               # 涉及安全敏感时用这个
+
+如果坚持跳过（不推荐），重新跑：/done codex
+```
+
+如果用户在 `$ARGUMENTS` 里写了 `codex`，跳过本节但**在最终报告里显式记一条 "⚠️ codex review skipped by user"**，让用户在 commit / PR 描述里看见。
+
+如果不命中任一触发器（trivial 改动 / 纯文档 / 1-2 行修复），跳过本节，正常往下。
 
 ### 6. CLAUDE.md 回写检查（按 SKILL.md "犯错和修复后"节）
 

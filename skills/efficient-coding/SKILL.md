@@ -291,7 +291,15 @@ typo、格式、通用编程常识、一次性偶发问题。
 
 ### 写到哪 + 怎么写
 
-**当前工作目录的 `CLAUDE.md`**（不是 `~/.claude/CLAUDE.md`）。不存在就创建。已存在追加到 `## 踩坑记录 / Known Pitfalls / Lessons Learned`。**不要写代码注释**——注释会过期。
+**当前工作目录的 `CLAUDE.md`**（也接受 `AGENTS.md`，看项目用哪个；不是 `~/.claude/CLAUDE.md`）。不存在就创建。已存在追加到 `## 踩坑记录 / Known Pitfalls / Lessons Learned`。
+
+**绝对不要写到这些地方**（即使工具方便也不要——它们解决不了同一个问题）：
+- ❌ **代码注释** —— 注释会过期，PR diff 会改掉它们，没人专门去翻。
+- ❌ **`~/.codex/memories/` / Codex 的 `update_memory` 工具** —— 那是**用户级**记忆（user-level memory），跨所有项目共享，**不会跟着项目走**。换台机器、新成员 clone、CI 容器都看不到。即使你是 Codex，**写到 cwd 的 `CLAUDE.md` 而不是 memory**——这是"踩坑跟着项目走"的强约束。
+- ❌ **`~/.claude/CLAUDE.md`** —— 同理，user-level，跨项目，不该装项目特定踩坑。
+- ❌ **commit message 单行** —— 单行容易丢上下文 + 后人不会专门 grep commit history。
+
+**为什么必须项目级**：项目踩坑只对这个项目有意义；跟着 git 走才能让下一个 contributor（人 / AI / 自己 6 个月后）在进入项目时看到。这就是 SKILL.md "先读项目契约"那条规则的依赖项。
 
 每条 3-5 行：
 
