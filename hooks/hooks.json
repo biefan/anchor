@@ -1,0 +1,49 @@
+{
+  "description": "anchor hooks for Claude Code AND Codex CLI when installed as a plugin. SessionStart injects project contracts; Stop blocks for incomplete task list in autonomous mode; PreToolUse blocks dangerous Bash commands; PostToolUse runs the matching linter on file edits.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/skills/efficient-coding/scripts/session-start-inject.sh\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/skills/efficient-coding/scripts/stop-self-check.sh\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/skills/efficient-coding/scripts/pre-tool-danger.sh\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/skills/efficient-coding/scripts/post-tool-lint.sh\"",
+            "timeout": 15
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,50 @@
+{
+  "_comment": "Merge the 'hooks' object below into your ~/.claude/settings.json. If 'hooks' already exists, merge each event array into the existing one. PreToolUse and PostToolUse hooks have low overhead (script exits early if tool doesn't match).",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$HOME/.claude/skills/efficient-coding/scripts/session-start-inject.sh\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$HOME/.claude/skills/efficient-coding/scripts/stop-self-check.sh\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$HOME/.claude/skills/efficient-coding/scripts/pre-tool-danger.sh\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$HOME/.claude/skills/efficient-coding/scripts/post-tool-lint.sh\"",
+            "timeout": 15
+          }
+        ]
+      }
+    ]
+  },
+  "_optional_statusline": "To show ec status in your status bar, set in settings.json: \"statusLine\": { \"type\": \"command\", \"command\": \"bash $HOME/.claude/skills/efficient-coding/scripts/statusline-wrapper.sh\" }. The wrapper assumes you currently use ccstatusline — edit MAIN in the script if you don't."
+}

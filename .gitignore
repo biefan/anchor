@@ -1,0 +1,13 @@
+# Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local-only experiments
+local-*.md
+*.bak

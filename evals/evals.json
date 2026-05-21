@@ -1,0 +1,65 @@
+{
+  "skill_name": "ec",
+  "_comment": "Evaluation prompts for ec skill. Run each prompt with-skill and without-skill, compare. Skill is loaded if available; baseline = same prompt with no skill files installed. See README.md for run instructions.",
+  "evals": [
+    {
+      "id": 1,
+      "name": "anti-drift-on-long-task",
+      "prompt": "在我的 monorepo 里加一个用户上传头像的功能：前端 React 表单组件、后端 Express POST 接口、数据库 migration。每个改动放在合适的目录（前端 src/web/，后端 src/api/，migration 在 migrations/）。改完跑下集成测试。",
+      "expected_behavior": "Skill 应当：(a) 在动手前用 TaskCreate 锁 scope，至少 5 个子 task；(b) 派 3 个 Explore agent 并行调研三个领域；(c) 实施时不顺手做范围外的事（如优化无关代码、改 logger 等）；(d) E2E 阶段实际跑测试或明说环境跑不动；(e) 全程不偏题。Baseline 容易：直接动手不锁 scope；串行 grep；中途发现 X 顺手改。",
+      "discriminators": [
+        "is_task_list_used",
+        "subagent_count_>= 2",
+        "no_unrelated_changes",
+        "explicit_e2e_step"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "multi-pass-vuln-scan",
+      "prompt": "审一下这个 Flask 应用的安全：app.py 是入口，routes/ 是路由，db/ 是数据库层。请详细告诉我有什么风险。",
+      "expected_behavior": "Skill 应当至少跑 3 遍扫描（模式 grep → 数据流追踪 → 跨文件）+ 推荐 codex 交叉验证；不只跑一遍 npm audit 就说'没问题'；finding 报告含 exploit scenario。",
+      "discriminators": [
+        "multiple_scan_passes",
+        "data_flow_analysis_mentioned",
+        "codex_review_suggested",
+        "exploit_scenario_per_finding"
+      ]
+    },
+    {
+      "id": 3,
+      "name": "pitfall-writeback",
+      "prompt": "我刚发现一个 bug：Redis pipeline 在 cluster 模式下，跨 slot 的命令被静默丢弃。改了 cache/batch.ts:42 用 hashtag 让 key 落同 slot。这种坑你帮我记录一下。",
+      "expected_behavior": "Skill 应当用 /pit 模板把这条踩坑追加到当前目录的 CLAUDE.md（创建文件如不存在），含现象/根因/修复/教训四要素，不直接在代码加注释。",
+      "discriminators": [
+        "claude_md_created_or_appended",
+        "four_field_structure_used",
+        "no_code_comment_solution",
+        "date_included"
+      ]
+    },
+    {
+      "id": 4,
+      "name": "e2e-not-just-tests",
+      "prompt": "我修了 src/api/users.ts 里 GET /api/users/:id 的一个 bug（之前 404 返回了 200）。单测我跑过了都过了。可以了吗？",
+      "expected_behavior": "Skill 应当指出：单测过 ≠ E2E 过；建议起 server 用 curl 真打一次；提示二阶问题（不存在的 user_id、超大 id、SQL 注入等）。Baseline 容易直接说'ok 应该可以了'。",
+      "discriminators": [
+        "real_curl_or_http_test_suggested",
+        "second_order_issues_raised",
+        "no_should_be_ok_handwave"
+      ]
+    },
+    {
+      "id": 5,
+      "name": "intent-clarification",
+      "prompt": "帮我改一下登录",
+      "expected_behavior": "Skill 应当先问 1-3 个关键问题（哪种登录、什么症状/期望、影响面），用 AskUserQuestion 给具体选项+推荐项。Baseline 容易直接猜并动手。",
+      "discriminators": [
+        "asks_question_before_acting",
+        "uses_AskUserQuestion",
+        "1_to_3_focused_questions",
+        "no_premature_implementation"
+      ]
+    }
+  ]
+}
