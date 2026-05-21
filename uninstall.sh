@@ -38,27 +38,35 @@ echo "  target: $CLAUDE_DIR"
 [ "$ALL_HOOKS" = "1" ] && echo "  flag: --all-hooks (also removes plugin-path hook entries)"
 echo ""
 
+# ---- 0. Acquire shared anchor lock — see install.sh for rationale. ----
+mkdir -p "$CLAUDE_DIR"
+LOCK_FILE="$CLAUDE_DIR/.anchor.lock"
+touch "$LOCK_FILE"
+exec 9>"$LOCK_FILE"
+if command -v flock >/dev/null 2>&1; then
+    if ! flock -w 30 9; then
+        echo "ERROR: could not acquire $LOCK_FILE within 30s — another install/uninstall is running?" >&2
+        exit 1
+    fi
+fi
+
 # ---- 1. Clean settings.json hook entries FIRST (before deleting scripts). ----
 # If this fails, scripts stay so the hooks still point at something real.
 if [ -f "$CLAUDE_DIR/settings.json" ]; then
     BACKUP="$(mktemp "$CLAUDE_DIR/settings.json.bak.XXXXXX")"
     cp "$CLAUDE_DIR/settings.json" "$BACKUP"
     if removed=$(ALL_HOOKS="$ALL_HOOKS" python3 - "$CLAUDE_DIR/settings.json" <<'PYEOF'
-import fcntl, json, os, re, stat, sys, tempfile
+import json, os, re, stat, sys, tempfile
 from pathlib import Path
 
+# flock is held by the parent bash script on ~/.claude/.anchor.lock; no need
+# to flock here. v1.4.1: removing the inode-level flock that os.replace bypassed.
 ANCHOR_SCRIPT_PAT = re.compile(r"efficient-coding/scripts/[\w.-]+\.sh")
 HOME_PATH_PAT = re.compile(r"(?:\$\{?HOME\}?|~)/\.claude/skills/efficient-coding/")
 PLUGIN_PATH_PAT = re.compile(r"\$\{?CLAUDE_PLUGIN_ROOT\}?")
 all_hooks = os.environ.get("ALL_HOOKS") == "1"
 
 path = Path(sys.argv[1])
-lock_fp = open(str(path), "r+")
-try:
-    fcntl.flock(lock_fp.fileno(), fcntl.LOCK_EX)
-except OSError:
-    pass
-
 try:
     orig_mode = stat.S_IMODE(os.stat(str(path)).st_mode)
 except OSError:
@@ -73,9 +81,11 @@ def should_remove(cmd):
         return False
     if all_hooks:
         return True
-    # Default: only remove home-scheme hooks (install.sh-managed). Leave
-    # plugin-managed hooks alone.
-    return bool(HOME_PATH_PAT.search(cmd)) or not bool(PLUGIN_PATH_PAT.search(cmd))
+    # Default: ONLY remove hooks whose path is the home-scheme install
+    # ($HOME/.claude/skills/efficient-coding/...). Plugin-managed and any
+    # unknown-scheme paths (custom wrappers, third-party install layouts)
+    # are left intact. --all-hooks opts into the broader sweep.
+    return bool(HOME_PATH_PAT.search(cmd))
 
 for event, groups in list(hooks.items()):
     new_groups = []

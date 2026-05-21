@@ -3,6 +3,80 @@
 All notable changes to **anchor** are tracked here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.1] — 2026-05-21
+
+Third-pass codex adversarial-review patch. After v1.4.0's PreToolUse rewrite, codex pass 3 found 19 more bugs — including 4 new critical bypasses of the freshly-rewritten hook. All 19 fixed here.
+
+### Fixed — 🔴 Critical (4 PreToolUse bypasses found in v1.4.0)
+
+- **C1 `shlex.split` doesn't split on unspaced separators**: `curl x|bash`, `echo ok;rm -rf /`, `cat a&rm -rf /` all returned 1 token instead of multiple. This made v1.4.0's whole pipeline analysis fall over for the most common attack shape. Switched both `_tokenize_with_punctuation` and `shlex_pipeline_stages` to `shlex.shlex(s, posix=True, punctuation_chars=True)` which recognizes `();<>|&` (and multi-char `&&`/`||`/`;;`) as standalone tokens even without surrounding whitespace.
+- **C2 wrapper value-flag eaten the real command**: `sudo -u root rm -rf /` consumed `rm` as `-u`'s value (treating the next token as the user name's continuation). Same bug for `env -u FOO rm`, `timeout 5 rm`. Replaced the permissive "any -X eats next token" unwrap with a **per-wrapper schema** (`WRAPPER_VALUE_FLAGS` dict) listing exactly which flags take values. Plus `WRAPPERS_WITH_LEADING_POSITIONAL` for wrappers like `timeout` and `chrt` whose first positional arg is NOT the command.
+- **C3 shell `-c` not scanned recursively**: `bash -c "rm -rf /"`, `sh -c "..."`, `eval "rm -rf /"`, `su -c "..."` all bypassed all checks because the inner shell string was never re-tokenized. Added `check_shell_dash_c` (handles bash/sh/dash/ash/zsh/ksh/fish/tcsh/su/doas) and `check_eval` — both recursively run the same scanner over the inner command string and substitution bodies.
+- **C4 xargs feeds target via stdin**: `printf / | xargs -r rm -rf` — scanned as `rm -rf` with no target (PASS!), but at runtime xargs appended `/` from stdin and ran `rm -rf /`. Now `check_xargs` unconditionally blocks when the sub-command is destructive (`rm`/`rmdir`/`shred`/`mv`/`dd`/`mkfs`/`chown`/`chmod`/etc) regardless of explicit args.
+
+### Fixed — 🟠 High (7 PreToolUse correctness)
+
+- **C5 WRAPPERS list expanded**: added `timeout`/`watch`/`taskset`/`parallel`/`chrt` — each with its own option schema. Without these, `timeout 5 rm -rf /` skipped past the timeout and never reached the rm rule.
+- **C6 sub-command not unwrapped before recursive scan**: `find / -exec env rm -rf {} \;` — find's sub-cmd `env rm -rf {}` was scanned as-is, find_exec saw `env` as the command (safe). `scan_argv` now calls `strip_env_assignments_and_wrappers` on its input, so nested wrappers are stripped before pattern matching.
+- **C7 sed e modifier missed after shlex dequoting**: `sed '1e rm -rf /'` after `shlex.split` becomes `['sed', '1e rm -rf /']` — the quote is gone. v1.4.0's regex still required quotes. Rewrote to scan each individual argv token for the `e` modifier pattern.
+- **C8 rm target regex missed dynamic forms**: bare `$VAR`, root glob `/*`, `/?`, `/[abc]`, brace expansion `/{etc,var}`, and any leading `*` weren't caught. Extended `UNKNOWN_TARGETS` regex.
+- **C9 `_find_matching_paren` not quote-aware**: `$(printf '('; rm -rf /)` confused the balanced-paren extractor because the `(` inside `'...'` was counted as a real open. Rewrote to track single/double-quoted regions and skip parens inside them.
+- **C10 obfuscation detector missed argv0 concatenation**: `$'r'$'m' -rf /` and `r${x:-}m -rf /` — multiple `$'...'` fragments at command start or `${VAR:-...}` with letter concatenation are obfuscation tells. Added two new `OBFUSCATION_CHECKS` patterns.
+- **C11 pipeline shell sink whitelist too narrow**: v1.4.0 only blocked `<fetcher> | shell` and `<decoder> | shell`. But `cat script | bash`, `printf 'rm -rf /' | bash` are the same risk class. Now ANY pipeline whose final stage is a shell/interpreter (`bash`/`sh`/`python`/`node`/...) blocks unconditionally.
+
+### Fixed — 🟠 Install/uninstall race + lock correctness (3)
+
+- **C12-C13 flock on settings.json inode was useless after `os.replace`**: when a process held a flock on `settings.json` and another process called `os.replace`, the new file got a new inode — the next process flock'd a *different* kernel lock object. No serialization happened. Both install.sh and uninstall.sh now `flock -w 30 9` a permanent lock file `~/.claude/.anchor.lock` (which is never replaced), held by the bash parent for the entire script duration. Python no longer needs its own flock layer.
+- **C14 install file copy + settings merge not in same critical section**: between the `cp` of script files and the `python3 -` block that updates settings.json, an interleaved uninstall could remove settings entries pointing at scripts we just wrote, or vice-versa. Now the shell-level lock covers both steps.
+
+### Fixed — 🟡 Medium (3)
+
+- **C15 fresh-install branch wasn't lock-protected**: an interleaved process creating `settings.json` between our `[ -f ]` check and write could lose its changes. The lock now covers the entire conditional.
+- **C16 uninstall default filter actually removed unknown schemes too**: the predicate was `home OR not-plugin`, which evaluated true for any path whose source we couldn't classify (custom wrapper paths, third-party install layouts). Now it's strictly `bool(HOME_PATH_PAT.search(cmd))` — unknown schemes survive unless `--all-hooks` is passed.
+- **C17 dedup name→single-entry collapsed multi-hook configs**: if a user had the same anchor script registered twice (e.g. accidentally added via both plugin and `./install.sh`), v1.4.0's dedup map only remembered the last index, leaving the duplicate behind. Now `existing_anchor_map` is a `defaultdict(list)` collecting all matches; dedup picks the highest-priority scheme (home > plugin > other-anchor) to update, and marks the rest for removal.
+
+### Fixed — 🟢 Low (1)
+
+- **C18 backup created outside lock**: install.sh's `cp settings.json $BACKUP` ran before the lock was acquired in earlier versions. The lock now covers the backup too, so concurrent install/uninstall pairs can't race the backup with the modification.
+
+### Verified — 47 / 47 regression tests
+
+- v1.4.0 history suite (`/tmp/test-pretool-v1.4.sh`): **32/32 pass** (B1-B19 from codex round 2 + 12 historical).
+- v1.4.1 new suite (`/tmp/test-c1-c4.sh`): **15/15 pass** (C1-C11 from codex round 3 + variants):
+  ```
+  C1 unspaced pipe (curl x|bash)               BLOCK ✓
+  C1 unspaced semicolon (echo ok;rm -rf /)     BLOCK ✓
+  C2 sudo -u root rm -rf /                     BLOCK ✓
+  C3 bash -c 'rm -rf /'                         BLOCK ✓
+  C3 sh -c                                      BLOCK ✓
+  C3 eval                                       BLOCK ✓
+  C4 xargs stdin (rm -rf via stdin)             BLOCK ✓
+  C5 timeout wrapper                            BLOCK ✓
+  C6 find -exec env rm bypass                   BLOCK ✓
+  C7 sed '1e rm -rf /'                          BLOCK ✓
+  C8 bare $VAR / glob /* / brace                BLOCK ✓
+  C11 cat | bash, printf-literal | bash         BLOCK ✓
+  ```
+- `shellcheck` PASS on all 9 shell scripts.
+- `install.sh` idempotent live re-run on this machine: exit 0.
+
+### Audit history total
+
+- External review (v1.3.6): 10
+- Self-audit (v1.3.7): 5
+- Codex pass 1 (v1.3.8): 15
+- Codex pass 2 (v1.4.0): 19
+- **Codex pass 3 (v1.4.1): 19**
+- Cumulative: **68 bugs in 5 audit passes**. Each pass found problems the prior passes didn't see. This is now the strongest possible empirical case for SKILL.md's "多遍扫，扫到为止" rule.
+
+### Documentation note
+
+PreToolUse hook header retains the v1.4.0 limitation note: "sufficiently obfuscated shell can defeat any static analyzer. We block obvious obfuscation rather than try to decode it. Hook is *anti-instinct first defense*, not *anti-motivated-attacker last resort*." After 3 codex passes specifically trying to break it, that framing is still accurate — even with shlex tokenization, wrapper schemas, shell -c recursion, and quote-aware paren matching, a sufficiently motivated attacker can still craft a bypass (the OS sandbox is the real safety boundary).
+
+### Plugin manifest
+
+- Versions bumped 1.4.0 → 1.4.1.
+
 ## [1.4.0] — 2026-05-21
 
 Second-pass codex adversarial-review patch. **Major version bump because `pre-tool-danger.sh` is fully rewritten** around shell tokenization (Python `shlex`) instead of regex on the raw command string. The previous regex layer was inherently bypassable by quoting, hex escapes, `${IFS}`, command wrappers, and nested substitution — codex pass 2 demonstrated 5 of those bypass classes. All 19 issues from that pass are addressed here.

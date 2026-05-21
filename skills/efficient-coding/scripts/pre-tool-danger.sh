@@ -69,6 +69,12 @@ OBFUSCATION_CHECKS = [
      "$IFS 替代空白通常是绕过 — 用空格"),
     (r"\\x[0-9a-fA-F]{2}.*?\\x[0-9a-fA-F]{2}.*?\\x[0-9a-fA-F]{2}",
      "命令含多个十六进制转义序列 — 改成明文"),
+    # argv0 concatenation: $'r'$'m' / r${x:-}m and similar. Match >=2
+    # adjacent $'...' or ${...} fragments at the start of the (trimmed) command.
+    (r"^\s*(?:\$'[^']*'){2,}",
+     "命令以多个 $'...' 片段开头拼接 — 通常是 obfuscation"),
+    (r"^\s*[A-Za-z]?\$\{[A-Za-z_]+(?::-[^}]*)?\}[A-Za-z]+",
+     "命令开头含 ${VAR:-...} 与字母拼接 — 通常是 obfuscation"),
 ]
 
 
@@ -79,9 +85,58 @@ OBFUSCATION_CHECKS = [
 # --------------------------------------------------------------------------
 
 # Programs that wrap another command — strip them to find the real argv0.
-# `env -i`, `env -u VAR`, `env VAR=val`, `command -p`, `sudo -E`, etc.
+# Per-wrapper schema: maps wrapper name to a set of short/long flags that
+# TAKE A VALUE (so we skip the value too instead of treating it as the real cmd).
+# Flags not in the set are treated as boolean (skip just the flag).
 WRAPPERS = {"env", "command", "sudo", "exec", "doas", "su",
-            "time", "nice", "ionice", "unshare", "setpriv", "stdbuf"}
+            "time", "nice", "ionice", "unshare", "setpriv", "stdbuf",
+            "timeout", "watch", "taskset", "chrt", "parallel"}
+
+WRAPPER_VALUE_FLAGS = {
+    # sudo -u USER, -g GROUP, -p PROMPT, -r ROLE, -t TYPE, -C FD
+    "sudo": {"-u", "-g", "-p", "-r", "-t", "-C", "-T", "-D"},
+    # env -u VAR, -S string, --unset=VAR (= form handled separately)
+    "env": {"-u", "-S"},
+    # command -p / -v / -V are boolean
+    "command": set(),
+    # exec -a NAME, -l (boolean), -c (boolean)
+    "exec": {"-a"},
+    # doas -u USER
+    "doas": {"-u", "-C"},
+    # su - USER or su USER or su -l USER or su -s SHELL USER (treat as having
+    # value flags). Critically: su -c CMD takes a shell command — see check_shell_dash_c.
+    "su": {"-s", "--shell", "--user"},
+    # timeout 5s cmd... — first non-flag arg is the duration (NOT the cmd).
+    # We mark "timeout" as having a positional arity of 1.
+    "timeout": {"-s", "--signal", "-k", "--kill-after"},
+    # watch -n SEC, -d (bool), -t (bool), -p (bool)
+    "watch": {"-n", "--interval", "-c", "--color", "-e", "--errexit", "-g", "--chgexit", "-x", "--exec", "-w", "--no-wrap"},
+    # taskset -c CPULIST cmd
+    "taskset": {"-c", "--cpu-list", "-p", "--pid"},
+    # chrt POLICY PRIO cmd
+    "chrt": {"-p", "--pid"},
+    # nice -n NUM cmd
+    "nice": {"-n", "--adjustment"},
+    # ionice -c CLASS, -n PRIO, -p PID
+    "ionice": {"-c", "-n", "-p", "--class", "--classdata", "--pid"},
+    # unshare --mount, --uts, etc — most are boolean
+    "unshare": set(),
+    # setpriv --reuid=UID etc — = form
+    "setpriv": set(),
+    # stdbuf -i/-o/-e MODE
+    "stdbuf": {"-i", "--input", "-o", "--output", "-e", "--error"},
+    # parallel: complex syntax; we conservatively treat as wrapper but rely on
+    # the recursive scan_argv to catch dangerous sub-commands.
+    "parallel": {"-j", "--jobs", "-N", "--max-args", "-n", "-L", "--max-replace-args"},
+    # time -p (bool), -o FILE, --output=FILE
+    "time": {"-o", "--output", "-f", "--format"},
+    # env is unique: arguments that look like VAR=val (or --) come before the
+    # real command, not after. Handled in strip_env_assignments_and_wrappers.
+}
+
+# Wrappers whose first POSITIONAL argument is NOT the command (e.g. timeout's
+# duration). We skip 1 positional arg after option processing.
+WRAPPERS_WITH_LEADING_POSITIONAL = {"timeout": 1, "chrt": 2}
 
 # Safe commands that can't realistically destroy state on their own.
 # Removed since v1.4: env, command (wrappers — caught above);
@@ -108,49 +163,102 @@ def basename(token):
 
 
 def strip_env_assignments_and_wrappers(tokens):
-    """Skip VAR=val prefixes and wrapper invocations to find the real argv."""
+    """Skip VAR=val prefixes and wrapper invocations to find the real argv.
+
+    Properly schemas each wrapper's flags so we don't accidentally consume
+    the real command as a wrapper's flag-value.
+
+    Recursively unwraps nested wrappers (`sudo env command rm` → `rm`).
+    """
     i = 0
     while i < len(tokens):
+        if i >= len(tokens):
+            break
         t = tokens[i]
         if not t:
             i += 1
             continue
-        # VAR=VAL prefix
+        # VAR=VAL prefix (only at the very start or after env)
         if "=" in t and re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", t):
             i += 1
             continue
         # Wrappers
-        if basename(t) in WRAPPERS:
+        wname = basename(t)
+        if wname in WRAPPERS:
             i += 1
-            # Skip wrapper-specific flags. Be permissive: any -X / --X / VAR=val.
+            value_flags = WRAPPER_VALUE_FLAGS.get(wname, set())
+            # Skip option flags
             while i < len(tokens):
                 arg = tokens[i]
-                if arg.startswith("-") or ("=" in arg and re.match(r"^[A-Za-z_]", arg)):
+                if arg == "--":
                     i += 1
-                else:
                     break
+                if arg.startswith("--") and "=" in arg:
+                    # --flag=value: single token
+                    i += 1
+                    continue
+                if arg in value_flags:
+                    i += 2  # flag + value
+                    continue
+                if arg.startswith("-") and arg != "-":
+                    i += 1  # boolean flag
+                    continue
+                if "=" in arg and re.match(r"^[A-Za-z_]", arg) and wname == "env":
+                    # env VAR=val passes env vars to the inner cmd
+                    i += 1
+                    continue
+                break
+            # Skip leading positional arg(s) that aren't the command
+            # (e.g. timeout 5s cmd, chrt POLICY PRIO cmd)
+            for _ in range(WRAPPERS_WITH_LEADING_POSITIONAL.get(wname, 0)):
+                if i < len(tokens):
+                    i += 1
             continue
         break
     return tokens[i:]
 
 
-SEP_TOKENS = {"|", "||", "&&", ";", "&", "\n"}
+SEP_TOKENS = {"|", "||", "&&", ";", ";;", "&", "\n", ">", ">>", "<", "<<", "<<<"}
+
+
+def _tokenize_with_punctuation(cmd_str):
+    """shlex tokenization that recognizes |, ;, &, etc. as separate tokens
+    even WITHOUT surrounding whitespace.
+
+    Default `shlex.split` does NOT split on punctuation, so `curl x|bash`
+    tokenizes as `['curl', 'x|bash']` — completely missing the pipeline.
+    `punctuation_chars=True` fixes that: it treats `();<>|&` as standalone
+    tokens, plus multi-char `&&`/`||`/`;;` etc.
+    """
+    lex = shlex.shlex(cmd_str, posix=True, punctuation_chars=True)
+    lex.whitespace_split = True
+    return list(lex)
 
 
 def shlex_split_stages(cmd_str):
-    """Tokenize cmd via shlex (quote-aware), then split tokens into stages on
-    pipeline / sequence operators. Returns (list_of_stage_argvs, ok). When
-    shlex fails (unbalanced quotes etc.), ok=False signals obfuscation.
+    """Tokenize cmd via shlex with punctuation awareness, then split tokens
+    into stages on pipeline / sequence operators. Returns (list_of_stage_argvs,
+    ok). When shlex fails (unbalanced quotes etc.), ok=False signals
+    obfuscation.
     """
     try:
-        tokens = shlex.split(cmd_str, posix=True)
+        tokens = _tokenize_with_punctuation(cmd_str)
     except ValueError:
         return None, False
     stages = [[]]
+    skip_next = False
     for t in tokens:
+        if skip_next:
+            skip_next = False
+            continue
         if t in SEP_TOKENS:
             if stages[-1]:
                 stages.append([])
+            continue
+        # File redirection: skip the target token (we don't care about >file).
+        # But ">file" without space is a single token, handled by SEP_TOKENS check.
+        if t in {">", "<", ">>", "<<", "<<<"}:
+            skip_next = True
             continue
         stages[-1].append(t)
     return [s for s in stages if s], True
@@ -200,16 +308,34 @@ def extract_substitutions(s, depth=0):
 
 
 def _find_matching_paren(s, open_idx):
-    """Find index of `)` matching the `(` at open_idx. -1 if unbalanced."""
+    """Find index of `)` matching the `(` at open_idx, ignoring parens inside
+    single/double-quoted regions. -1 if unbalanced.
+    """
     depth = 0
     i = open_idx
+    in_single = False
+    in_double = False
     while i < len(s):
-        if s[i] == "(":
-            depth += 1
-        elif s[i] == ")":
-            depth -= 1
-            if depth == 0:
-                return i
+        c = s[i]
+        if not in_single and not in_double:
+            if c == "(":
+                depth += 1
+            elif c == ")":
+                depth -= 1
+                if depth == 0:
+                    return i
+            elif c == "'":
+                in_single = True
+            elif c == '"':
+                in_double = True
+        elif in_single:
+            if c == "'":
+                in_single = False
+        elif in_double:
+            if c == '"':
+                in_double = False
+            elif c == "\\" and i + 1 < len(s):
+                i += 1  # skip escaped char inside double quotes
         i += 1
     return -1
 
@@ -259,7 +385,12 @@ def check_rm(argv):
     # $HOME / ~ / $PWD and any child.
     HOME_VARS = re.compile(r"^(?:~|\$\{?HOME\}?|\$\{?PWD\}?)(?:/.*)?$")
     # Substitution / placeholder / variable expansion — unknown expansion is dangerous.
-    UNKNOWN_TARGETS = re.compile(r"(?:\{\}|\$\(|`|\$\{|\$\*|\$@)")
+    # Includes: {} (find placeholder), $(...), `...`, ${VAR}, $*, $@, bare $VAR,
+    # glob /* /? /[...], brace expansion /{a,b}.
+    UNKNOWN_TARGETS = re.compile(
+        r"(?:\{\}|\$\(|`|\$\{|\$\*|\$@|\$[A-Za-z_]\w*"
+        r"|^/?\*|/\*(?:$|/)|/\?|/\[[^\]]+\]|/\{[^}]+\})"
+    )
     for t in targets:
         if BARE_ROOT.match(t) or DANGEROUS_BARE.match(t) or DANGEROUS_CHILDREN.match(t) or HOME_VARS.match(t):
             return f"rm -rf 针对危险目标 {t!r} — 不可逆"
@@ -400,35 +531,122 @@ def check_awk_system(argv):
 def check_sed_e(argv):
     if not argv or basename(argv[0]) != "sed":
         return None
-    # -e 'X e cmd' or '... e cmd' executes shell
-    program = " ".join(argv[1:])
-    if re.search(r"['\"]\s*\d*\s*e\s+", program):
-        return "sed e 修饰符执行 shell — 等同 shell injection vector"
+    # After shlex.split, quotes are stripped — programs look like '1e rm -rf /'
+    # not "'1e rm -rf /'". So check each individual argv token for the e cmd.
+    for tok in argv[1:]:
+        # `e` modifier on a number range: `1e cmd`, `/pat/e cmd`
+        # also -e form: argv contains ['-e', '1e cmd'] after shlex
+        if re.search(r"(?:^|;|/)\s*\d*\s*e\b[ \t]", tok):
+            return "sed e 修饰符执行 shell — 等同 shell injection vector"
+        # Same pattern after /pattern/ address
+        if re.search(r"/[^/]*/\s*e\b[ \t]", tok):
+            return "sed /pat/e 修饰符执行 shell — 等同 shell injection vector"
     return None
+
+
+XARGS_VALUE_FLAGS = {"-I", "-J", "-L", "-n", "-P", "-s", "-E", "-a", "-d",
+                     "--max-args", "--max-chars", "--max-lines", "--max-procs",
+                     "--arg-file", "--replace", "--delimiter", "--eof"}
+DESTRUCTIVE_NAMES = {"rm", "rmdir", "shred", "mv", "dd", "mkfs", "chown", "chmod",
+                     "cp", "fdisk", "wipefs", "blkdiscard", "format"}
 
 
 def check_xargs(argv):
     if not argv or basename(argv[0]) != "xargs":
         return None
-    # xargs invokes whatever follows it — check the wrapped command.
-    # Find arg after flags.
+    # Skip xargs options to find the sub-command.
     i = 1
     while i < len(argv):
         a = argv[i]
-        if a.startswith("-"):
-            # Some xargs flags take values
-            if a in ("-I", "-J", "-L", "-n", "-P", "-s", "-E"):
-                i += 2
-            elif a.startswith("--") and "=" not in a and a in ("--max-args",):
-                i += 2
-            else:
-                i += 1
+        if a == "--":
+            i += 1
+            break
+        if a in XARGS_VALUE_FLAGS or a.startswith("--arg-file="):
+            i += (2 if a in XARGS_VALUE_FLAGS else 1)
+            continue
+        if a.startswith("-") and a != "-":
+            i += 1
             continue
         break
-    if i < len(argv):
-        msg = scan_argv(argv[i:], sub_check=True)
+    if i >= len(argv):
+        return None
+    sub = argv[i:]
+    # Unwrap wrappers in the sub-command too (find -exec env rm bypass).
+    sub_unwrapped = strip_env_assignments_and_wrappers(sub)
+    if not sub_unwrapped:
+        return None
+    sub_cmd = basename(sub_unwrapped[0])
+    # xargs feeds stdin tokens as additional args — a destructive sub-command
+    # whose explicit argv shows no target STILL gets one at runtime via stdin.
+    # That's a dynamic target we can't see, so always block destructive xargs.
+    if sub_cmd in DESTRUCTIVE_NAMES:
+        return f"xargs 调用破坏性命令 {sub_cmd!r} — stdin 决定 target，扫描看不到"
+    msg = scan_argv(sub_unwrapped, sub_check=True)
+    if msg:
+        return f"xargs 嵌入危险命令: {msg}"
+    return None
+
+
+def check_shell_dash_c(argv):
+    """`bash -c "rm -rf /"`, `sh -c ...`, `su -c "..."`, `ssh host -- "..."`.
+
+    Recursively scan the shell command string by re-entering the whole pipeline.
+    """
+    if not argv:
+        return None
+    cmd0 = basename(argv[0])
+    SHELLS_WITH_C = {"sh", "bash", "dash", "ash", "zsh", "ksh", "fish", "tcsh",
+                     "busybox", "su", "doas"}
+    if cmd0 not in SHELLS_WITH_C:
+        return None
+    # Find -c flag and its value.
+    for i, a in enumerate(argv[1:], start=1):
+        if a == "-c" and i + 1 < len(argv):
+            inner = argv[i + 1]
+            # Recursively check the inner shell command string by treating it
+            # as a fresh cmd. Use the same scanner via re-tokenization.
+            sub_stages, ok = shlex_split_stages(inner)
+            if not ok:
+                return f"{cmd0} -c 内的命令字符串无法 tokenize — obfuscation"
+            for stage_argv in sub_stages or []:
+                real = strip_env_assignments_and_wrappers(stage_argv)
+                if not real:
+                    continue
+                msg = scan_argv(real)
+                if msg:
+                    return f"{cmd0} -c 嵌入危险命令: {msg}"
+            # Also scan substitution bodies in the inner cmd
+            for body in extract_substitutions(inner):
+                body_stages, ok = shlex_split_stages(body)
+                for s in body_stages or []:
+                    real = strip_env_assignments_and_wrappers(s)
+                    if not real:
+                        continue
+                    msg = scan_argv(real)
+                    if msg:
+                        return f"{cmd0} -c substitution 含危险命令: {msg}"
+            break
+    return None
+
+
+def check_eval(argv):
+    """eval "rm -rf /" — direct shell command-string execution."""
+    if not argv or basename(argv[0]) != "eval":
+        return None
+    # eval concatenates its args with spaces and executes as shell.
+    joined = " ".join(argv[1:])
+    if not joined.strip():
+        return None
+    sub_stages, ok = shlex_split_stages(joined)
+    if not ok:
+        return "eval 含无法 tokenize 的命令字符串 — obfuscation"
+    for stage_argv in sub_stages or []:
+        real = strip_env_assignments_and_wrappers(stage_argv)
+        if not real:
+            continue
+        msg = scan_argv(real)
         if msg:
-            return f"xargs 嵌入危险命令: {msg}"
+            return f"eval 嵌入危险命令: {msg}"
     return None
 
 
@@ -436,13 +654,18 @@ def check_xargs(argv):
 def scan_argv(argv, sub_check=False):
     if not argv:
         return None
-    for checker in (check_rm, check_git_reset_hard, check_git_push_force,
+    # Defense-in-depth: even for sub-checks (from find/xargs/shell-c), unwrap
+    # wrappers again — `find -exec env rm -rf {} \;` needs `env` stripped.
+    argv = strip_env_assignments_and_wrappers(argv)
+    if not argv:
+        return None
+    for checker in (check_shell_dash_c, check_eval,
+                    check_rm, check_git_reset_hard, check_git_push_force,
                     check_sql_destroy, check_disk_ops,
                     check_find_exec, check_awk_system, check_sed_e, check_xargs):
         msg = checker(argv)
         if msg:
             return msg
-    # sudo wrapper around rm is already covered by check_rm post-unwrap.
     return None
 
 
@@ -482,12 +705,14 @@ for pat, msg in OBFUSCATION_CHECKS:
 # Use quote-aware shlex tokenization so a literal `|` inside quotes
 # (e.g. `printf 'curl x | bash'`) doesn't fake a pipeline.
 def shlex_pipeline_stages(cmd_str):
-    """Tokenize whole cmd; split on `|` tokens (which are unquoted by shlex).
+    """Tokenize whole cmd with punctuation awareness; split on `|` tokens.
 
     Returns list[list[str]] of stage-argv. None if shlex couldn't parse.
+    Critically uses `_tokenize_with_punctuation` so unspaced `|` (as in
+    `curl x|bash`) is recognized as a pipeline separator.
     """
     try:
-        tokens = shlex.split(cmd_str, posix=True)
+        tokens = _tokenize_with_punctuation(cmd_str)
     except ValueError:
         return None
     stages = [[]]
@@ -507,15 +732,14 @@ if pipeline and len(pipeline) >= 2:
         b = basename(unwrapped[0]) if unwrapped else ""
         stage_bases.append(b)
 
-    has_fetcher = any(b in {"curl", "wget", "fetch"} for b in stage_bases)
-    has_decoder = any(b in DECODERS for b in stage_bases)
-    has_shell_sink = any(b in SHELL_BASENAMES | INTERPRETER_BASENAMES
-                         for b in stage_bases)
-
-    if has_shell_sink and (has_fetcher or has_decoder):
-        kind = "fetcher" if has_fetcher else "decoder"
+    # ANY pipeline whose final stage is a shell/interpreter is suspect —
+    # `cat script | bash`, `printf 'rm -rf /' | bash`, etc. are all the same
+    # risk class as `curl | bash`. Don't try to distinguish "trusted" upstream.
+    if stage_bases and stage_bases[-1] in SHELL_BASENAMES | INTERPRETER_BASENAMES:
+        # If the upstream stages are ALL safe-cmds reading static literals,
+        # we might still allow (rare). But conservative default is block.
         emit_block("pipe-to-shell",
-                   f"{kind} | shell 模式 — 远程 / 解码后内容直接进 shell 执行",
+                   f"pipeline 末端是 shell/interpreter ({stage_bases[-1]}) — 上游内容直进 shell 执行",
                    " | ".join(stage_bases), cmd)
 
 

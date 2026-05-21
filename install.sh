@@ -33,6 +33,22 @@ done
 
 echo "anchor installer"
 
+# ---- 0. Acquire shared anchor lock (covers file copy + settings.json RMW).
+# The lock file is permanent (never replaced) so concurrent installs/
+# uninstalls actually serialize on the same kernel lock object.
+# Previously we flock'd settings.json itself, but `os.replace` changes the
+# inode, and the next process flock'd a different object — no serialization.
+mkdir -p "$CLAUDE_DIR"
+LOCK_FILE="$CLAUDE_DIR/.anchor.lock"
+touch "$LOCK_FILE"
+exec 9>"$LOCK_FILE"
+if command -v flock >/dev/null 2>&1; then
+    if ! flock -w 30 9; then
+        echo "ERROR: could not acquire $LOCK_FILE within 30s — another install/uninstall is running?" >&2
+        exit 1
+    fi
+fi
+
 # ---- 1. Claude Code: skill + commands ----
 mkdir -p "$CLAUDE_DIR/skills/efficient-coding/references"
 mkdir -p "$CLAUDE_DIR/skills/efficient-coding/scripts"
@@ -51,11 +67,12 @@ if [ "$WITH_HOOKS" = "1" ]; then
         BACKUP="$(mktemp "$CLAUDE_DIR/settings.json.bak.XXXXXX")"
         cp "$CLAUDE_DIR/settings.json" "$BACKUP"
         python3 - "$SCRIPT_DIR/settings.hooks.json" "$CLAUDE_DIR/settings.json" <<'PYEOF'
-import fcntl, json, os, re, stat, sys, tempfile
+import collections, json, os, re, stat, sys, tempfile
 from pathlib import Path
 
-# Dedup keys: scheme-aware so we can distinguish a hook installed via the
-# plugin marketplace path from one installed by ./install.sh.
+# Dedup keys: scheme-aware so we distinguish a hook installed via the plugin
+# marketplace path from one installed by ./install.sh. (flock is held by the
+# parent bash script on ~/.claude/.anchor.lock — no need to flock here.)
 ANCHOR_SCRIPT_PAT = re.compile(r"efficient-coding/scripts/([\w.-]+\.sh)")
 PLUGIN_PATH_PAT = re.compile(r"\$\{?CLAUDE_PLUGIN_ROOT\}?")
 HOME_PATH_PAT = re.compile(r"(?:\$\{?HOME\}?|~)/\.claude/skills/efficient-coding/")
@@ -76,16 +93,6 @@ def anchor_key(cmd):
 src = json.loads(Path(sys.argv[1]).read_text())
 src_hooks = src.get("hooks", {})
 target_path = Path(sys.argv[2])
-
-# Lock the settings.json itself for read-modify-write. flock auto-releases
-# at process exit. Concurrent installs / uninstalls will serialize here
-# instead of stomping on each other.
-lock_fp = open(str(target_path), "r+")
-try:
-    fcntl.flock(lock_fp.fileno(), fcntl.LOCK_EX)
-except OSError:
-    pass  # filesystem may not support flock — proceed best-effort
-
 target = json.loads(target_path.read_text())
 existing = target.get("hooks", {})
 
@@ -97,15 +104,18 @@ except OSError:
 
 added = 0
 replaced = 0
+removed_dup = 0
 for event, groups in src_hooks.items():
     existing.setdefault(event, [])
-    # Build map from anchor-script-name → (group_index, hook_index, scheme).
-    existing_anchor_map = {}
+    # Build map: anchor-script-name → list of (group_index, hook_index, scheme).
+    # Multiple entries with the same script name (under different schemes) are
+    # tracked separately so we can collapse duplicates.
+    existing_anchor_map = collections.defaultdict(list)
     for gi, g in enumerate(existing[event]):
         for hi, h in enumerate(g.get("hooks", [])):
             k = anchor_key(h.get("command", ""))
             if k[0] == "anchor":
-                existing_anchor_map[k[1]] = (gi, hi, k[2])
+                existing_anchor_map[k[1]].append((gi, hi, k[2]))
 
     for grp in groups:
         grp_keys = {anchor_key(h["command"]) for h in grp.get("hooks", [])}
@@ -114,23 +124,39 @@ for event, groups in src_hooks.items():
             existing[event].append(grp)
             added += 1
             continue
-        # If every anchor script in this group is already present under any
-        # scheme, decide based on scheme: if existing is plugin-scheme and
-        # we're installing home-scheme via ./install.sh, replace the entries
-        # so we don't leave the user with stale plugin paths.
         if anchor_names_in_grp.issubset(existing_anchor_map):
             our_scheme = next(iter(k[2] for k in grp_keys if k[0] == "anchor"), "")
             for name in anchor_names_in_grp:
-                gi, hi, ex_scheme = existing_anchor_map[name]
-                if our_scheme == "home" and ex_scheme == "plugin":
-                    # Replace the existing hook entry with our home-path one.
+                entries = existing_anchor_map[name]
+                # Preferred scheme priority: home > plugin > other-anchor.
+                SCHEME_RANK = {"home": 0, "plugin": 1, "other-anchor": 2}
+                # If we're installing home-scheme and any entry isn't home,
+                # update the first to home-cmd and mark the rest as removable.
+                if our_scheme == "home":
                     new_cmd = next(h["command"] for h in grp["hooks"]
                                    if anchor_key(h["command"])[1] == name)
-                    existing[event][gi]["hooks"][hi]["command"] = new_cmd
-                    replaced += 1
+                    entries_sorted = sorted(entries, key=lambda e: SCHEME_RANK.get(e[2], 99))
+                    keeper_gi, keeper_hi, keeper_scheme = entries_sorted[0]
+                    if keeper_scheme != "home":
+                        existing[event][keeper_gi]["hooks"][keeper_hi]["command"] = new_cmd
+                        replaced += 1
+                    # Mark duplicates for removal
+                    for gi, hi, _ in entries_sorted[1:]:
+                        existing[event][gi]["hooks"][hi]["_anchor_drop"] = True
+                        removed_dup += 1
             continue
         existing[event].append(grp)
         added += 1
+
+# Now actually drop the marked duplicate hook entries.
+for event, groups in existing.items():
+    new_groups = []
+    for g in groups:
+        kept = [h for h in g.get("hooks", []) if not h.pop("_anchor_drop", False)]
+        if kept:
+            g["hooks"] = kept
+            new_groups.append(g)
+    existing[event] = new_groups
 
 target["hooks"] = existing
 # Atomic write: tmp in same dir + os.replace.
@@ -144,10 +170,12 @@ except Exception:
     try: os.unlink(tmp)
     except OSError: pass
     raise
+parts = [f"merged {added} new"]
 if replaced:
-    print(f"    (merged {added} new + replaced {replaced} stale-path hook entries)")
-else:
-    print(f"    (merged {added} new hook entries)")
+    parts.append(f"replaced {replaced} stale-path")
+if removed_dup:
+    parts.append(f"removed {removed_dup} duplicate")
+print(f"    ({', '.join(parts)} hook entries)")
 PYEOF
         echo "  ✓ Claude Code: hooks merged into settings.json (backup: $(basename "$BACKUP"))"
     else
