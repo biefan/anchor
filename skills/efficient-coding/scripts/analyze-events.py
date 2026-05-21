@@ -30,7 +30,9 @@ def load_events(path, since):
     if not os.path.exists(path):
         return []
     events = []
-    with open(path) as f:
+    # encoding="utf-8", errors="replace" so a stray non-UTF-8 byte (e.g. from
+    # a hook env var containing weird bytes) doesn't crash the whole reader.
+    with open(path, encoding="utf-8", errors="replace") as f:
         for line in f:
             line = line.strip()
             if not line:

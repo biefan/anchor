@@ -81,21 +81,40 @@ for event, groups in src_hooks.items():
         added += 1
 
 target["hooks"] = existing
-target_path.write_text(json.dumps(target, indent=2))
+# Atomic write: serialize to tmp file in the same dir, then os.replace.
+# Avoids leaving a half-written settings.json if install.sh is interrupted.
+import os, tempfile
+fd, tmp = tempfile.mkstemp(prefix=target_path.name + ".", dir=str(target_path.parent))
+try:
+    with os.fdopen(fd, "w") as fh:
+        fh.write(json.dumps(target, indent=2))
+    os.replace(tmp, str(target_path))
+except Exception:
+    try: os.unlink(tmp)
+    except OSError: pass
+    raise
 print(f"    (merged {added} new hook entries)")
 PYEOF
         echo "  ✓ Claude Code: hooks merged into settings.json (backup: $(basename "$BACKUP"))"
     else
         # Fresh install — write a settings.json containing only hooks.
-        # Paths are passed via sys.argv (NOT inline string interpolation) so a
-        # path containing a single quote can't break the Python source.
+        # Paths passed via sys.argv; atomic write (tmp + os.replace).
         python3 - "$SCRIPT_DIR/settings.hooks.json" "$CLAUDE_DIR/settings.json" <<'PYEOF'
-import json, sys
+import json, os, sys, tempfile
 from pathlib import Path
 src = json.loads(Path(sys.argv[1]).read_text())
 src.pop('_comment', None)
 src.pop('_optional_statusline', None)
-Path(sys.argv[2]).write_text(json.dumps(src, indent=2))
+target = Path(sys.argv[2])
+fd, tmp = tempfile.mkstemp(prefix=target.name + ".", dir=str(target.parent))
+try:
+    with os.fdopen(fd, "w") as fh:
+        fh.write(json.dumps(src, indent=2))
+    os.replace(tmp, str(target))
+except Exception:
+    try: os.unlink(tmp)
+    except OSError: pass
+    raise
 PYEOF
         echo "  ✓ Claude Code: created ~/.claude/settings.json with hooks"
     fi

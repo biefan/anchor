@@ -92,15 +92,22 @@ def collect_evidence(sandbox: Path) -> str:
         parts.append("== git diff --stat ==")
         parts.append(out.stdout.strip() or "(no diff)")
         parts.append("")
-        # File listing (top 20, excluding common dep trees)
-        skip_dirs = {".git", "node_modules", "vendor", "site-packages", "target", ".venv", "venv", "__pycache__"}
+        # File listing (top 20, excluding common dep trees).
+        # Use os.walk so we can PRUNE skip_dirs in-place — rglob would still
+        # recurse into a 100k-file node_modules/ and stall, even though every
+        # entry would be filtered out.
+        skip_dirs = {".git", "node_modules", "vendor", "site-packages", "target", ".venv", "venv", "__pycache__", "dist", "build"}
         files = []
-        for p in sandbox.rglob("*"):
-            if not p.is_file():
-                continue
-            if any(part in skip_dirs for part in p.parts):
-                continue
-            files.append(str(p.relative_to(sandbox)))
+        for root, dirs, fs in os.walk(str(sandbox)):
+            # Prune skip dirs in place so os.walk doesn't descend into them.
+            dirs[:] = [d for d in dirs if d not in skip_dirs]
+            for fname in fs:
+                p = Path(root) / fname
+                files.append(str(p.relative_to(sandbox)))
+                if len(files) > 200:  # plenty for sampling — we only show top 20
+                    break
+            if len(files) > 200:
+                break
         files = sorted(files)[:20]
         parts.append("== Files in sandbox (top 20, excluding deps) ==")
         parts.append("\n".join(files) if files else "(empty)")
@@ -183,11 +190,29 @@ def _collect_dep_evidence(sandbox: Path) -> str:
 
 
 def codex_judge(prompt: str, timeout: int = 240) -> str:
-    """Run codex exec, return the assistant's final text response."""
-    proc = subprocess.run(
-        ["codex", "exec", "--json", "--skip-git-repo-check", prompt],
-        capture_output=True, text=True, timeout=timeout,
-    )
+    """Run codex exec, return the assistant's final text response.
+
+    Catches timeout / missing-binary / non-zero exit explicitly so a stuck
+    or offline judge produces a structured error string rather than
+    crashing grade.py mid-grading.
+    """
+    try:
+        proc = subprocess.run(
+            ["codex", "exec", "--json", "--skip-git-repo-check", prompt],
+            capture_output=True, text=True, timeout=timeout,
+        )
+    except FileNotFoundError:
+        return '{"results": [], "error": "codex binary not found on PATH"}'
+    except subprocess.TimeoutExpired:
+        return f'{{"results": [], "error": "codex exec timed out after {timeout}s"}}'
+    except Exception as e:
+        return f'{{"results": [], "error": "codex exec failed: {e!r}"}}'
+
+    if proc.returncode != 0 and not proc.stdout.strip():
+        # Hard fail with no stdout — show stderr summary
+        err = (proc.stderr or "").strip().replace('"', "'")[:200]
+        return f'{{"results": [], "error": "codex returned {proc.returncode}: {err}"}}'
+
     parts = []
     for line in proc.stdout.splitlines():
         line = line.strip()

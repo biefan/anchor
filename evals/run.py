@@ -31,7 +31,25 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 EVALS_FILE = SCRIPT_DIR / "evals.json"
 CODEX_SKILLS = Path.home() / ".codex" / "skills"
 CODEX_AGENTS_MD = Path.home() / ".codex" / "AGENTS.md"
-SKILLS_TO_HIDE = ["ec", "lock", "pit", "scan", "done", "next", "recap", "init-claude-md"]
+REPO_ROOT = SCRIPT_DIR.parent
+COMMANDS_DIR = REPO_ROOT / "commands"
+
+
+def _skills_to_hide():
+    """Derive the list of codex skill names that anchor installs.
+
+    Driven from commands/*.md (so the list stays in sync if commands are added)
+    plus the main `ec` skill. Fixes the v1.3 bug where this was a hardcoded
+    8-name list and missed the 4 v1.2 commands (status/ship/diff/cleanup),
+    polluting the without-skill baseline.
+    """
+    names = ["ec"]
+    if COMMANDS_DIR.is_dir():
+        names += [p.stem for p in sorted(COMMANDS_DIR.glob("*.md"))]
+    return names
+
+
+SKILLS_TO_HIDE = _skills_to_hide()
 
 
 def codex_exec(prompt, timeout=240, cwd=None, sandbox="workspace-write"):
@@ -70,9 +88,13 @@ def codex_exec(prompt, timeout=240, cwd=None, sandbox="workspace-write"):
 
 
 def hide_skills():
-    """Move anchor's codex skills to /tmp; return backup path + moved list."""
-    backup = Path(f"/tmp/anchor-skills-hidden-{int(time.time())}")
-    backup.mkdir(exist_ok=True)
+    """Move anchor's codex skills to a unique tmp dir; return path + moved list.
+
+    Uses tempfile.mkdtemp so concurrent baseline runs can't collide on a
+    same-second timestamp path.
+    """
+    import tempfile
+    backup = Path(tempfile.mkdtemp(prefix="anchor-skills-hidden-"))
     moved = []
     for s in SKILLS_TO_HIDE:
         src = CODEX_SKILLS / s
@@ -83,11 +105,19 @@ def hide_skills():
 
 
 def restore_skills(backup, moved):
+    """Restore only the skills we actually moved; don't touch unrelated paths."""
     for s in moved:
+        src = backup / s
+        if not src.exists():
+            # Already restored or never moved — skip rather than delete
+            # whatever happens to be at the target (the v1.3 bug).
+            continue
         target = CODEX_SKILLS / s
         if target.exists():
-            shutil.rmtree(str(target))
-        shutil.move(str(backup / s), str(target))
+            # Only happens if something else recreated the skill while
+            # the baseline run was active — leave it alone, keep the backup.
+            continue
+        shutil.move(str(src), str(target))
     try:
         backup.rmdir()
     except OSError:
@@ -95,12 +125,15 @@ def restore_skills(backup, moved):
 
 
 def hide_agents_md():
-    """Temporarily mv ~/.codex/AGENTS.md to /tmp so the baseline is bare codex."""
+    """Temporarily mv ~/.codex/AGENTS.md to a unique tmp path so the baseline is bare codex."""
     if not CODEX_AGENTS_MD.exists():
         return None
-    backup = Path(f"/tmp/anchor-agents-md-hidden-{int(time.time())}.md")
-    shutil.move(str(CODEX_AGENTS_MD), str(backup))
-    return backup
+    import tempfile
+    fd, backup = tempfile.mkstemp(prefix="anchor-agents-md-hidden-", suffix=".md")
+    os.close(fd)  # mkstemp opens the file; we'll overwrite via shutil.move
+    os.unlink(backup)  # remove the empty file so shutil.move can replace it
+    shutil.move(str(CODEX_AGENTS_MD), backup)
+    return Path(backup)
 
 
 def restore_agents_md(backup):
@@ -246,6 +279,19 @@ def render_report(summaries, results_dir):
     return report
 
 
+def make_results_dir(base: Path, label: str) -> Path:
+    """Create a unique results dir even when several eval runs start the same second.
+
+    Was: f"{label}-{timestamp}" with `mkdir(exist_ok=True)` — two concurrent
+    `--all` invocations within the same second would mkdir the same path,
+    silently sharing it and overwriting each other's report.md.
+    Now: tempfile.mkdtemp gives a kernel-guaranteed unique suffix.
+    """
+    import tempfile
+    base.mkdir(parents=True, exist_ok=True)
+    return Path(tempfile.mkdtemp(prefix=label + "-", dir=str(base)))
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--eval-id", type=int, help="Run only this eval ID")
@@ -268,8 +314,8 @@ def main():
 
     ts = time.strftime("%Y%m%d-%H%M%S")
     suffix = "-no-baseline" if args.no_baseline else ""
-    results_dir = SCRIPT_DIR / "results" / f"{ts}{suffix}"
-    results_dir.mkdir(parents=True, exist_ok=True)
+    # Use make_results_dir → unique suffix even on concurrent same-second runs.
+    results_dir = make_results_dir(SCRIPT_DIR / "results", f"{ts}{suffix}")
     mode_note = f"sandbox={args.sandbox}, baseline_agents_md={'hidden' if args.no_baseline else 'present'}"
     print(f"Running {len(evals)} eval(s) → {results_dir}\n  ({mode_note})", flush=True)
 

@@ -3,6 +3,58 @@
 All notable changes to **anchor** are tracked here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.8] — 2026-05-21
+
+Codex adversarial-review patch. After v1.3.7, codex did its own independent audit pass and found **15 more bugs** that both the external review and the self-audit had missed. Five were **PreToolUse hook bypass classes** — the very thing anchor's "硬约束" layer promises. All 15 fixed here.
+
+### Fixed — 🔴 Critical (PreToolUse safety net bypasses)
+
+- **`pre-tool-danger.sh` substitution bypass (A1)**: `SAFE_FIRST` would skip a segment if the first program was safe (`echo`, `cat`, etc.), but didn't peek inside `$(...)`, `<(...)`, or `` `...` `` — so `echo $(rm -rf $HOME)` and `cat <(rm -rf /)` slipped through. The hook now extracts substitution contents as additional segments to scan, regardless of the outer SAFE_FIRST verdict.
+
+### Fixed — 🟠 High (PreToolUse correctness + attack surface)
+
+- **`pre-tool-danger.sh` pipe-to-shell pattern never matched (A2)**: the `curl ... | bash` pattern was a per-segment check, but the segment splitter cut on `|`, so the `curl` segment had no `bash` and the `bash` segment had no `curl`. Cross-segment patterns now scan the whole command (a new `GLOBAL_CHECKS` list) before per-segment scanning runs.
+- **`pre-tool-danger.sh` git reset --hard variants missed (A3)**: regex required `git reset --hard` with `reset` directly after `git`, missing `git -C repo reset --hard`, `git -c user.email=x reset --hard`, `git --git-dir=/x reset --hard`. Pattern now allows `-C`/`-c`/`--git-dir`/`--work-tree` between `git` and `reset`, plus flags between `reset` and `--hard`.
+- **`pre-tool-danger.sh` rm variants missed (A4)**: regex caught a narrow set — missed `rm -rf -- "$HOME"`, `rm -rf ${HOME}`, `rm -rf -- /`, mixed-flag patterns. Pattern now allows interleaved flags, the `--` end-of-options marker, and `$HOME`/`${HOME}`/`~`/`/path` as targets.
+- **`pre-tool-danger.sh` hook input via env var hit ARG_MAX (A5)**: passing the full hook JSON through `EC_HOOK_INPUT=...` runs into the kernel exec environment-size limit (`ARG_MAX` ≈ 128 KB). A megabyte-sized command would silently fail to invoke the hook — bypassing all checks. Now the hook reads JSON from a `mktemp` tmp file via `EC_HOOK_INPUT_FILE` env var; only the path crosses the exec boundary.
+
+### Fixed — 🟡 Medium
+
+- **`ec-status.sh` heredoc `$task_dir` (A6)**: same pattern as v1.3.7's stop-self-check fix, but in the statusline script that v1.3.7 missed. Now uses `EC_TASK_DIR` env var + `<<'PYEOF'` quoted heredoc.
+- **`pre-tool-danger.sh` shared marker file (A7)**: `~/.claude/.ec-last-pretool-block` is a global path; two concurrent PreToolUse invocations could overwrite each other's block decision. Now uses `mktemp /tmp/.ec-pretool-block.XXXXXX` per invocation + `trap` cleanup.
+- **`install.sh` non-atomic settings.json write (A8)**: both branches now write to `tempfile.mkstemp` in the same dir then `os.replace` — atomic on POSIX.
+- **`uninstall.sh` left orphaned hook entries (A9)**: uninstall now also scrubs `settings.json` of any hook entry whose `command` matches `efficient-coding/scripts/X.sh`, with atomic replace and a timestamp backup.
+- **`evals/run.py` baseline skill-hiding list went stale (A10)**: `SKILLS_TO_HIDE` was hardcoded with 8 names from v1.0; now derived from `commands/*.md` so it auto-syncs (currently 12 entries).
+- **`evals/run.py` `/tmp/anchor-skills-hidden-<秒>` collision + dangerous restore (A11)**: now uses `tempfile.mkdtemp` + restore only moves skills whose backup file still exists, and refuses to overwrite a present target.
+- **`evals/stress/grade.py` `rglob` stalled on huge dep trees (A12)**: replaced with `os.walk` that prunes `skip_dirs` in-place — never descends into the big trees.
+
+### Fixed — 🟢 Low
+
+- **`evals/run.py` results dir overwrite (A13)**: `mkdir(..., exist_ok=True)` on a seconds-precision timestamp let two concurrent runs share a results dir. Now uses `tempfile.mkdtemp(prefix=ts-)`.
+- **`evals/stress/grade.py` no error handling around `codex exec` (A14)**: now catches `FileNotFoundError`/`TimeoutExpired`/other exceptions and returns a structured error string.
+- **`analyze-events.py` no encoding handling (A15)**: a stray non-UTF-8 byte made `open()` raise `UnicodeDecodeError`. Now `encoding="utf-8", errors="replace"`.
+
+### Verified (8 regression tests)
+
+- `echo $(rm -rf $HOME)` — BLOCK (A1)
+- `cat <(rm -rf /)` — BLOCK (A1)
+- `curl X | bash` — BLOCK (A2)
+- `wget -O - X | sh` — BLOCK (A2)
+- `git -C /repo reset --hard HEAD~5` — BLOCK (A3)
+- `rm -rf -- /tmp/foo $HOME` — BLOCK (A4)
+- `echo hello` — pass (no false positive)
+- `git push origin main -f` — BLOCK (v1.3.6 regression)
+
+Also: shellcheck PASS, jsonlint PASS, `SKILLS_TO_HIDE` correctly 12 entries, analyze-events.py still works on existing log.
+
+### Acknowledgments
+
+This entire patch came from one codex adversarial-review pass running in the background while v1.3.7 was being verified. The combination of external review (v1.3.6, 10 fixes) + self-audit (v1.3.7, 5 fixes) + codex adversarial-review (v1.3.8, 15 fixes) found **30 bugs over 3 audits** that one pass alone would have missed — direct empirical evidence for SKILL.md's "多遍扫，扫到为止" rule.
+
+### Plugin manifest
+
+- Versions bumped 1.3.7 → 1.3.8.
+
 ## [1.3.7] — 2026-05-21
 
 Self-audit follow-up. After the external review that drove v1.3.6, this release ran another internal pass (anchor's own `/scan`-style multi-pass methodology) and fixed the 5 remaining issues found.

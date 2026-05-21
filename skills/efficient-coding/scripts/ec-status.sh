@@ -27,10 +27,13 @@ except Exception:
 if [ -n "$session_id" ]; then
     task_dir="$HOME/.claude/tasks/$session_id"
     if [ -d "$task_dir" ]; then
-        counts=$(python3 <<PYEOF 2>/dev/null
+        # task_dir contains session_id from hook input — pass via env var
+        # so its contents never enter Python source as a literal.
+        counts=$(EC_TASK_DIR="$task_dir" python3 - <<'PYEOF' 2>/dev/null
 import json, os, glob
+task_dir = os.environ.get("EC_TASK_DIR", "")
 pending = ip = done = 0
-for p in glob.glob(os.path.join("$task_dir", "*.json")):
+for p in glob.glob(os.path.join(task_dir, "*.json")):
     try:
         with open(p) as f:
             s = json.load(f).get("status", "")

@@ -56,8 +56,53 @@ done
 
 echo ""
 echo "✓ Files removed."
-echo ""
-echo "Manual step:"
-echo "  Edit $CLAUDE_DIR/settings.json and remove the SessionStart / Stop hook entries"
-echo "  whose 'command' references session-start-inject.sh or stop-self-check.sh."
+
+# Also remove anchor's hook entries from settings.json so Claude Code doesn't
+# try to call deleted scripts on next launch (v1.3.8 fix).
+if [ -f "$CLAUDE_DIR/settings.json" ]; then
+    BACKUP="$CLAUDE_DIR/settings.json.bak.$(date +%s)"
+    cp "$CLAUDE_DIR/settings.json" "$BACKUP"
+    removed=$(python3 - "$CLAUDE_DIR/settings.json" <<'PYEOF'
+import json, os, re, sys, tempfile
+from pathlib import Path
+path = Path(sys.argv[1])
+data = json.loads(path.read_text())
+hooks = data.get("hooks", {})
+PAT = re.compile(r"efficient-coding/scripts/[\w.-]+\.sh")
+removed = 0
+for event, groups in list(hooks.items()):
+    new_groups = []
+    for grp in groups:
+        kept = [h for h in grp.get("hooks", []) if not PAT.search(h.get("command", ""))]
+        skipped = len(grp.get("hooks", [])) - len(kept)
+        removed += skipped
+        if kept:
+            grp["hooks"] = kept
+            new_groups.append(grp)
+        elif not skipped:
+            new_groups.append(grp)
+    if new_groups:
+        hooks[event] = new_groups
+    else:
+        hooks.pop(event, None)
+data["hooks"] = hooks
+# Atomic replace
+fd, tmp = tempfile.mkstemp(prefix=path.name + ".", dir=str(path.parent))
+try:
+    with os.fdopen(fd, "w") as fh:
+        fh.write(json.dumps(data, indent=2))
+    os.replace(tmp, str(path))
+except Exception:
+    try: os.unlink(tmp)
+    except OSError: pass
+    raise
+print(removed)
+PYEOF
+)
+    if [ "${removed:-0}" -gt 0 ]; then
+        echo "→ Removed $removed anchor hook entries from settings.json (backup: $(basename "$BACKUP"))"
+    else
+        rm -f "$BACKUP"
+    fi
+fi
 echo ""
