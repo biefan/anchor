@@ -75,9 +75,11 @@ if not os.path.exists(HOOK):
     sys.exit(1)
 
 p = f = 0
+# v1.13.0: chown/source/mount/sysctl patterns are STRICT-only now. Enable for tests.
+env = {**os.environ, "ANCHOR_STRICT": "1"}
 for expect, cmd, desc in TESTS:
     inp = json.dumps({"tool_name": "Bash", "tool_input": {"command": cmd}})
-    r = subprocess.run(["bash", HOOK], input=inp, capture_output=True, text=True)
+    r = subprocess.run(["bash", HOOK], input=inp, capture_output=True, text=True, env=env)
     actual = "BLOCK" if '"decision": "block"' in r.stdout else "PASS"
     if actual == expect:
         p += 1

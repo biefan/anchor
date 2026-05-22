@@ -149,9 +149,11 @@ TESTS = [
 ]
 
 p = f = 0
+# v1.13.0: admin patterns are now opt-in (strict mode). Enable for these tests.
+env = {**os.environ, "ANCHOR_STRICT": "1"}
 for expect, cmd, desc in TESTS:
     inp = json.dumps({"tool_name": "Bash", "tool_input": {"command": cmd}})
-    r = subprocess.run(["bash", HOOK], input=inp, capture_output=True, text=True)
+    r = subprocess.run(["bash", HOOK], input=inp, capture_output=True, text=True, env=env)
     actual = "BLOCK" if '"decision": "block"' in r.stdout else "PASS"
     if actual == expect:
         p += 1

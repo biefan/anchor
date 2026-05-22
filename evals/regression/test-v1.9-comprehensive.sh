@@ -191,9 +191,9 @@ for f in "$CMDS_DIR"/*.md; do
 done
 check "D2 all command files non-empty" PASS
 
-# D3: Count of commands matches expected (v1.9.0 = 22)
+# D3: Count of commands matches expected (v1.13.0 = 23, was 22 before /strict)
 count=$(ls "$CMDS_DIR"/*.md | wc -l | tr -d ' ')
-[ "$count" -eq 22 ] && check "D3 22 commands present" PASS || check "D3 22 commands present (got $count)" FAIL
+[ "$count" -eq 23 ] && check "D3 23 commands present" PASS || check "D3 23 commands present (got $count)" FAIL
 
 echo ""
 echo "=== Section E: Templates ==="
@@ -218,9 +218,9 @@ HOME="$TEST_HOME" bash "$REPO_ROOT/install.sh" --no-hooks > /dev/null 2>&1
 # F2: install.sh creates skill dir
 [ -d "$TEST_HOME/.claude/skills/anchor" ] && check "F2 install creates skills/anchor/" PASS || check "F2 install creates skills/anchor/" FAIL
 
-# F3: 22 commands installed
+# F3: 23 commands installed (v1.13.0 added /strict)
 installed_cmds=$(find "$TEST_HOME/.claude/commands" -maxdepth 1 -name '*.md' 2>/dev/null | wc -l | tr -d ' ')
-[ "$installed_cmds" -eq 22 ] && check "F3 22 commands installed" PASS || check "F3 22 commands installed (got $installed_cmds)" FAIL
+[ "$installed_cmds" -eq 23 ] && check "F3 23 commands installed" PASS || check "F3 23 commands installed (got $installed_cmds)" FAIL
 
 # F4: templates installed
 [ -d "$TEST_HOME/.claude/skills/anchor/references/templates" ] && check "F4 templates dir installed" PASS || check "F4 templates dir installed" FAIL

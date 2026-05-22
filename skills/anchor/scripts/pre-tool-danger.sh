@@ -764,12 +764,14 @@ def check_disk_ops(argv):
     return None
 
 
-# v1.5.2: Destructive admin commands dispatch table.
-# Each cmd → list of (regex, msg). Regex runs against " ".join(argv[1:]).
-# Covers ~30 attack surfaces beyond rm/git/disk: firewall ops, service control,
-# cron deletion, privilege backdoors, log shredding, cloud nuke, container prune,
-# system shutdown, immutable-bit toggling, mass kill, package uninstall, symlink
-# overwrite of system paths.
+# v1.13.0: split admin patterns into 2 tiers (user feedback: default too strict)
+#   ADMIN_ALWAYS_BLOCK — real disasters you'd never want even on dev (system kill /
+#                        disk wipe / privilege backdoors / system lockdown)
+#   ADMIN_STRICT_ONLY  — opt-in via ~/.claude/.anchor-strict or ANCHOR_STRICT=1
+#                        (package mgmt / service control / cloud nuke / firewall /
+#                         user mgmt / etc — needed in daily dev)
+# v1.5.2: original dispatch table — Each cmd → list of (regex, msg). Regex runs
+# against " ".join(argv[1:]).
 ADMIN_DESTRUCTIVE_PATTERNS = {
     "truncate": [
         (r"(?:^|\s)-s\s*0(?:\s|$)|--size[=\s]+0(?:\s|$)", "truncate -s 0 清空文件内容"),
@@ -1007,13 +1009,110 @@ ADMIN_DESTRUCTIVE_PATTERNS = {
     ],
 }
 
+# v1.13.0: which patterns are ALWAYS blocked (real disasters you'd never want
+# accidentally executed even on dev environments). The rest are opt-in via
+# strict mode (~/.claude/.anchor-strict or env ANCHOR_STRICT=1).
+ADMIN_ALWAYS_BLOCK_KEYS = {
+    # Disk wipe — never undoable
+    "mkfs", "fdisk", "wipefs", "blkdiscard",
+    # System lockdown (root mount readonly handled by special pattern below)
+    # PID 1 / mass kill — break system
+    # (handled by special pattern filtering — see check_destructive_admin)
+}
+
+# Per-key, also block specific patterns (subset of ADMIN_DESTRUCTIVE_PATTERNS)
+# even when strict mode is OFF. These are the "even on dev, this is a disaster".
+ADMIN_ALWAYS_BLOCK_PATTERNS = {
+    "mount": [
+        # remount,ro / — lock root readonly is system-breaking
+        (r"-o\s+[^\s]*remount[^\s]*,ro\b[^|;&]*\s/\s*$|\bremount,ro\b[^|;&]*\s/\s*$",
+         "mount remount,ro / 锁死系统"),
+    ],
+    "kill": [
+        (r"(?:^|\s)-(?:9|KILL|SIGKILL)\s+-1(?:\s|$)", "kill -9 -1 杀光所有进程"),
+        (r"(?:^|\s)-(?:9|KILL|SIGKILL)\s+1(?:\s|$)", "kill -9 1 杀 PID 1"),
+    ],
+    "pkill": [
+        (r"(?:^|\s)-9?\s+(systemd|init)\b", "pkill systemd/init = 杀 PID 1"),
+        (r"--signal\s+(?:9|KILL)\s+(systemd|init)\b", "pkill --signal KILL systemd"),
+    ],
+    "killall": [
+        (r"(?:^|\s)-9?\s+(systemd|init)\b", "killall systemd/init"),
+    ],
+    "setcap": [
+        # Privilege escalation backdoor (cap_setuid on arbitrary binary)
+        (r"\bcap_(setuid|setgid|sys_admin|sys_ptrace)[=,+]",
+         "setcap 特权能力 — 提权后门"),
+    ],
+    "chattr": [
+        # +i on /etc/passwd or /etc/shadow = persistent tampering
+        (r"(?:^|\s)[+\-=]i\b[^|;&]*?\s/(?:etc/passwd|etc/shadow|etc/sudoers|boot|root)\b",
+         "chattr ±i 系统认证关键文件"),
+    ],
+    "useradd": [
+        (r"(?:^|\s)-u\s*0(?:\s|$)|--uid[=\s]+0", "useradd UID 0 创建 root 后门"),
+        (r"(?:^|\s)-o(?:\s|$)|--non-unique", "useradd -o 允许重复 UID — root 后门"),
+    ],
+    "usermod": [
+        (r"(?:^|\s)-u\s*0(?:\s|$)|--uid[=\s]+0", "usermod 改 UID 为 0"),
+    ],
+    "passwd": [
+        # passwd -d root (empty password root login)
+        (r"(?:^|\s)-d\s+root(?:\s|$)", "passwd -d root 空密码 root"),
+    ],
+    "ln": [
+        # ln -sf to /etc/passwd / /etc/shadow / /bin / /sbin etc
+        (r"(?:^|\s)-s[fF]?\b[^|;&]*?\s(/(?:etc/passwd|etc/shadow|etc/sudoers|bin|sbin|boot)(?:/[^\s|;&]*)?)\s*$",
+         "ln -sf 系统认证 / boot / bin 路径 — 持久化篡改"),
+    ],
+    "source": [
+        # /etc/profile.d/ is privilege boundary (anything dropped there runs as
+        # whoever sources the file — usually root at login)
+        (r"(?:^|\s)/etc/profile\.d/",
+         "source /etc/profile.d/* — 让任意脚本以 privileged shell env 跑"),
+    ],
+    ".": [
+        (r"(?:^|\s)/etc/profile\.d/",
+         ". /etc/profile.d/* — 让任意脚本以 privileged shell env 跑"),
+    ],
+}
+
+
+def is_anchor_strict():
+    """v1.13.0: check if user opted into strict mode (more admin patterns blocked)."""
+    if os.environ.get("ANCHOR_STRICT") == "1":
+        return True
+    return os.path.exists(os.path.expanduser("~/.claude/.anchor-strict"))
+
 
 def check_destructive_admin(argv):
-    """v1.5.2: catch destructive admin commands beyond rm/git via dispatch table."""
+    """v1.13.0: 2-tier admin patterns.
+
+    Default: only block ALWAYS-block patterns (real disasters).
+    Strict mode: also apply full ADMIN_DESTRUCTIVE_PATTERNS dispatch.
+
+    Reason: user feedback that v1.5.2 / v1.10.0 default was too strict for
+    daily dev work (systemctl stop / apt remove -y / pip uninstall -y /
+    docker prune / etc are legit dev operations).
+    """
     if not argv:
         return None
     cmd0 = basename(argv[0])
-    patterns = ADMIN_DESTRUCTIVE_PATTERNS.get(cmd0)
+
+    # Always-block: full pattern set for cmds in ADMIN_ALWAYS_BLOCK_KEYS
+    if cmd0 in ADMIN_ALWAYS_BLOCK_KEYS:
+        patterns = list(ADMIN_DESTRUCTIVE_PATTERNS.get(cmd0, []))
+    else:
+        # Always-block: only specific patterns from ADMIN_ALWAYS_BLOCK_PATTERNS
+        patterns = list(ADMIN_ALWAYS_BLOCK_PATTERNS.get(cmd0, []))
+
+    # Strict mode: add remaining patterns from full dispatch table
+    if is_anchor_strict():
+        full = ADMIN_DESTRUCTIVE_PATTERNS.get(cmd0, [])
+        for p in full:
+            if p not in patterns:
+                patterns.append(p)
+
     if not patterns:
         return None
     joined = " " + " ".join(argv[1:]) + " "

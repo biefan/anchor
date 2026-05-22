@@ -262,7 +262,7 @@ if command -v codex >/dev/null 2>&1 && [ -d "$CODEX_DIR" ]; then
     # v1.11.0: also clean old cost/resume from codex
     rm -rf "$CODEX_DIR/skills/cost" "$CODEX_DIR/skills/resume"
     codex_count=0
-    for cmd in lock pit scan "done" next recap init-claude-md status ship diff cleanup ec spend report save resume-task milestone recall remember decide snapshot lean; do
+    for cmd in lock pit scan "done" next recap init-claude-md status ship diff cleanup ec spend report save resume-task milestone recall remember decide snapshot lean strict; do
         mkdir -p "$CODEX_DIR/skills/$cmd"
         cp "$SCRIPT_DIR/commands/$cmd.md" "$CODEX_DIR/skills/$cmd/SKILL.md"
         codex_count=$((codex_count + 1))

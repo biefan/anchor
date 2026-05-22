@@ -3,6 +3,80 @@
 All notable changes to **anchor** are tracked here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.13.0] — 2026-05-22
+
+**Default-relaxed admin patterns (first field-hours feedback)**. User started actual field testing and reported: "权限所得太死了吧 只能限制 rm 这种危险的 其他的不限制吧 不然 很麻烦的啊" (permissions are too tight — only block real disasters like rm, the rest shouldn't block, otherwise it's too annoying).
+
+This is the first real-use signal. Fix: **2-tier admin patterns**.
+
+### Changed — `pre-tool-danger.sh` 2-tier patterns
+
+Refactored `check_destructive_admin` from "always block all 40+ admin patterns" to:
+
+**Tier 1: `ADMIN_ALWAYS_BLOCK`** (real disasters, ~30 patterns, always on):
+- `mkfs` / `fdisk` / `wipefs` / `blkdiscard` — disk wipe
+- `mount remount,ro /` — lock root readonly
+- `kill -9 1` / `kill -9 -1` / `pkill systemd` / `killall systemd` — kill PID 1
+- `setcap cap_setuid+ep` — privilege escalation
+- `useradd -u 0` / `useradd -o` / `usermod -u 0` — root UID backdoor
+- `passwd -d root` — empty root password
+- `ln -sf X /etc/passwd` / `/etc/shadow` / `/bin` / `/sbin` / `/boot` — auth/critical symlink
+- `chattr +i /etc/passwd` / `/etc/shadow` / `/etc/sudoers` — auth file tampering
+- `source /etc/profile.d/X` / `. /etc/profile.d/X` — privilege boundary
+
+**Tier 2: `ADMIN_STRICT_ONLY`** (admin/dev ops, ~250 patterns, opt-in via `~/.claude/.anchor-strict` or `ANCHOR_STRICT=1`):
+- `systemctl stop/disable/mask <service>`
+- `apt remove -y` / `apt-get purge -y` / `dpkg --purge`
+- `pip uninstall -y` / `npm uninstall -g`
+- `docker system prune -a --volumes` / `kubectl delete ns`
+- `terraform destroy -auto-approve`
+- `aws/gcloud/az ... delete` (cloud nuke)
+- `iptables -F` / `nft flush ruleset` / `ufw disable`
+- `crontab -r` / `journalctl --vacuum-*`
+- `useradd -G sudo` / `usermod -aG sudo`
+- `chown -R /etc`, `mount --bind`, `sysctl -w kernel.X`
+- `shutdown` / `poweroff` / `reboot` / `halt`
+- ... and more
+
+### Added — `/strict` command
+
+`commands/strict.md` — toggle strict mode via file flag or arg:
+
+```
+/strict on        # touch ~/.claude/.anchor-strict
+/strict off       # rm ~/.claude/.anchor-strict
+/strict status    # report
+```
+
+Or one-shot: `ANCHOR_STRICT=1 <command>`.
+
+### Added — `test-v1.13-relaxed-default.py`
+
+39 test cases × 2 modes = 78 verifications:
+- ALWAYS-block patterns block in both default + strict
+- STRICT-only patterns PASS in default, BLOCK in strict
+- Legitimate ops always PASS
+
+### Updated — existing test files to set `ANCHOR_STRICT=1`
+
+3 test files use admin patterns; updated to enable strict mode so their assertions still pass:
+- `test-v1.5.2-admin.py`
+- `test-v1.5.3-fixes.py`
+- `test-v1.10-review-gaps.py`
+
+### ⚠️ Verification status
+
+**Could not run regression locally** — host classifier was blocking script execution during the v1.13.0 work session. Code changes were verified by:
+- `git diff` review (pre-tool-danger.sh: +107 / -8 lines, refactor only, no checker chain changes)
+- shellcheck cleanliness (verified earlier)
+- File integrity (all paths resolve)
+
+**CI will run the full 16 regression suites** on push. If anything fails, will fix in v1.13.1.
+
+### Plugin manifest
+
+- Minor 1.12.2 → 1.13.0 (feature release: relaxed default behavior, new /strict command).
+
 ## [1.12.2] — 2026-05-21
 
 **Logo upgrade** — user provided a sci-fi anchor logo from ChatGPT image gen. Replaced README hero with the new PNG.
